@@ -103,7 +103,7 @@ static void printSparse(const char* str, const mjtNum* mat, int nr,
     fprintf(fp, "  ");
     for (int adr=rowadr[r]; adr < rowadr[r]+rownnz[r]; adr++) {
       fprintf(fp, "  ");
-      fprintf(fp, "%d: ", colind[adr]);
+      fprintf(fp, "%2d: ", colind[adr]);
       fprintf(fp, float_format, mat[adr]);
     }
     fprintf(fp, "\n");
@@ -113,9 +113,46 @@ static void printSparse(const char* str, const mjtNum* mat, int nr,
 
 
 
+// print sparse inertia-like matrix
+static void printInertia(const char* str, const mjtNum* mat, const mjModel* m,
+                         FILE* fp, const char* float_format) {
+  int nv = m->nv;
+  // if no data, or too many rows to be visually useful, return
+  if (!mat || !nv || nv > 300) {
+    return;
+  }
+
+  // get length of string produced by float_format
+  char test[100];
+  int len = snprintf(test, sizeof(test), float_format, 0.0);
+
+  fprintf(fp, "%s\n", str);
+
+  for (int i=0; i < nv; i++) {
+    fprintf(fp, " ");
+    int adr = (i == nv-1) ? m->nM - 1 : m->dof_Madr[i+1] - 1;
+    for (int k=0; k <= i; k++) {
+      int j = i;
+      while (j != k && j >= 0) {
+        j = m->dof_parentid[j];
+      }
+      if (j == k) {
+        fprintf(fp, " ");
+        fprintf(fp, float_format, mat[adr--]);
+      } else {
+        for (int d=0; d < len+1; d++) fprintf(fp, " ");
+      }
+    }
+    fprintf(fp, "\n");
+  }
+  fprintf(fp, "\n");
+}
+
+
+
 // print sparse matrix structure
-static void printSparsity(const char* str, int nr, int nc,
-                     const int* rowadr, const int* rownnz, const int* colind, FILE* fp) {
+void mj_printSparsity(const char* str, int nr, int nc, const int* rowadr, const int* diag,
+                      const int* rownnz, const int* rowsuper, const int* colind, FILE* fp) {
   // if no rows / columns, or too many columns to be visually useful, return
   if (!nr || !nc || nc > 300) {
     return;
@@ -130,13 +167,19 @@ static void printSparsity(const char* str, int nr, int nc,
     int nnz = 0;
     for (int c=0; c < nc; c++) {
       if (nnz < rownnz[r] && colind[adr + nnz] == c) {
-        fprintf(fp, "x");
+        if (diag && diag[r] == nnz) {
+          fprintf(fp, "D");
+        } else {
+          fprintf(fp, "x");
+        }
         nnz++;
       } else {
         fprintf(fp, " ");
       }
     }
-    fprintf(fp, " |\n");
+    fprintf(fp, " |");
+    if (rowsuper && rowsuper[r] > 0) fprintf(fp, " %d", rowsuper[r]);
+    fprintf(fp, "\n");
     if (r < nr-1) fprintf(fp, " ");
   }
   for (int c=0; c < nc+2; c++) fprintf(fp, "-");
@@ -853,15 +896,12 @@ void mj_printModel(const mjModel* m, const char* filename) {
 
 // print mjModel to text file, specifying format. float_format must be a
 // valid printf-style format string for a single float value
-void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
+void mj_printFormattedData(const mjModel* m, const mjData* d, const char* filename,
                            const char* float_format) {
   // stack in use, SHOULD NOT OCCUR
   if (d->pstack) {
     mjERROR("attempting to print mjData when stack is in use");
   }
-
-  mjtNum *M = NULL;
-  mj_markStack(d);
 
   // check format string
   if (!validateFloatFormat(float_format)) {
@@ -880,13 +920,7 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   // check for nullptr
   if (!fp) {
     mju_warning("Could not open file '%s' for writing mjModel", filename);
-    mj_freeStack(d);
     return;
-  }
-
-  // allocate full inertia if it's small
-  if (m->nv <= 200) {
-    M = mj_stackAllocNum(d, m->nv*m->nv);
   }
 
 #ifdef MEMORY_SANITIZER
@@ -904,7 +938,8 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   fprintf(fp, "  total           %s\n",   memorySize(sizeof(mjData) + d->nbuffer + d->narena));
   fprintf(fp, "  struct          %s\n",   memorySize(sizeof(mjData)));
   fprintf(fp, "  buffer          %s\n",   memorySize(d->nbuffer));
-  fprintf(fp, "  arena           %s\n\n", memorySize(d->narena));
+  double arena_percent = 100 * d->maxuse_arena/(double)(d->narena);
+  fprintf(fp, "  arena           %s, used %.1f%%\n\n", memorySize(d->narena), arena_percent);
 
   // ---------------------------------- print mjData fields
 
@@ -983,7 +1018,7 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
         fprintf(fp, "    solver_niter = %d\n", d->solver_niter[island]);
         fprintf(fp, "    solver_nnz = %d\n",  d->solver_nnz[island]);
         for (int i=0; i < niter_stat; i++) {
-          mjSolverStat* stat = d->solver + island*mjNSOLVER + i;
+          const mjSolverStat* stat = d->solver + island*mjNSOLVER + i;
           fprintf(fp, "      %d:  improvement = ", i);
           fprintf(fp, float_format, stat->improvement);
           fprintf(fp, "    gradient = ");
@@ -1053,8 +1088,9 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   if (!mj_isSparse(m)) {
     printArray("FLEXEDGE_J", m->nflexedge, m->nv, d->flexedge_J, fp, float_format);
   } else {
-    printSparsity("FLEXEDGE_J: flex edge connectivity", m->nflexedge, m->nv,
-             d->flexedge_J_rowadr, d->flexedge_J_rownnz, d->flexedge_J_colind, fp);
+    mj_printSparsity("FLEXEDGE_J: flex edge connectivity", m->nflexedge, m->nv,
+                     d->flexedge_J_rowadr, NULL, d->flexedge_J_rownnz, NULL, d->flexedge_J_colind,
+                     fp);
     printArrayInt("FLEXEDGE_J_ROWNNZ", m->nflexedge, 1, d->flexedge_J_rownnz, fp);
     printArrayInt("FLEXEDGE_J_ROWADR", m->nflexedge, 1, d->flexedge_J_rowadr, fp);
     printSparse("FLEXEDGE_J", d->flexedge_J, m->nflexedge, d->flexedge_J_rownnz,
@@ -1066,8 +1102,8 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   if (!mj_isSparse(m)) {
     printArray("TEN_MOMENT", m->ntendon, m->nv, d->ten_J, fp, float_format);
   } else {
-    printSparsity("TEN_J: tendon moments", m->ntendon, m->nv,
-             d->ten_J_rowadr, d->ten_J_rownnz, d->ten_J_colind, fp);
+    mj_printSparsity("TEN_J: tendon moments", m->ntendon, m->nv, d->ten_J_rowadr, NULL,
+                     d->ten_J_rownnz, NULL, d->ten_J_colind, fp);
     printArrayInt("TEN_J_ROWNNZ", m->ntendon, 1, d->ten_J_rownnz, fp);
     printArrayInt("TEN_J_ROWADR", m->ntendon, 1, d->ten_J_rowadr, fp);
     printSparse("TEN_J", d->ten_J, m->ntendon, d->ten_J_rownnz,
@@ -1083,27 +1119,26 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   }
 
   printArray("ACTUATOR_LENGTH", m->nu, 1, d->actuator_length, fp, float_format);
-  printSparsity("actuator_moments", m->nu, m->nv,
-                d->moment_rowadr, d->moment_rownnz, d->moment_colind, fp);
+  mj_printSparsity("actuator_moment", m->nu, m->nv,
+                   d->moment_rowadr, NULL, d->moment_rownnz, NULL, d->moment_colind, fp);
   printSparse("ACTUATOR_MOMENT", d->actuator_moment, m->nu, d->moment_rownnz,
               d->moment_rowadr, d->moment_colind, fp, float_format);
   printArray("CRB", m->nbody, 10, d->crb, fp, float_format);
 
-  if (M) {
-    // construct and print full M matrix
-    mj_fullM(m, M, d->qM);
-    printArray("QM", m->nv, m->nv, M, fp, float_format);
+  printInertia("QM", d->qM, m, fp, float_format);
 
-    // construct and print full LD matrix
-    mj_fullM(m, M, d->qLD);
-    printArray("QLD", m->nv, m->nv, M, fp, float_format);
+  printSparse("QLD", d->qLD, m->nv, d->M_rownnz,
+              d->M_rowadr, d->M_colind, fp, float_format);
+  printArray("QLDIAGINV", m->nv, 1, d->qLDiagInv, fp, float_format);
+
+  if (!mju_isZero(d->qHDiagInv, m->nv)) {
+    printSparse("QH", d->qH, m->nv, d->M_rownnz, d->M_rowadr, d->M_colind, fp, float_format);
+    printArray("QHDIAGINV", m->nv, 1, d->qHDiagInv, fp, float_format);
   }
 
-  printArray("QLDIAGINV", m->nv, 1, d->qLDiagInv, fp, float_format);
-  printArray("QLDIAGSQRTINV", m->nv, 1, d->qLDiagSqrtInv, fp, float_format);
-
   // B sparse structure
-  printSparsity("B: body-dof matrix", m->nbody, m->nv, d->B_rowadr, d->B_rownnz, d->B_colind, fp);
+  mj_printSparsity("B: body-dof matrix", m->nbody, m->nv, d->B_rowadr, NULL, d->B_rownnz, NULL,
+                   d->B_colind, fp);
 
   // B_rownnz
   fprintf(fp, NAME_FORMAT, "B_rownnz");
@@ -1126,8 +1161,40 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   }
   fprintf(fp, "\n\n");
 
+  // M sparse structure
+  mj_printSparsity("M: inertia matrix", m->nv, m->nv, d->M_rowadr, NULL, d->M_rownnz,
+                   NULL, d->M_colind, fp);
+
+  fprintf(fp, NAME_FORMAT, "M_rownnz");
+  for (int i = 0; i < m->nv; i++) {
+    fprintf(fp, " %d", d->M_rownnz[i]);
+  }
+  fprintf(fp, "\n\n");
+
+  // M_rowadr
+  fprintf(fp, NAME_FORMAT, "M_rowadr");
+  for (int i = 0; i < m->nv; i++) {
+    fprintf(fp, " %d", d->M_rowadr[i]);
+  }
+  fprintf(fp, "\n\n");
+
+  // M_colind
+  fprintf(fp, NAME_FORMAT, "M_colind");
+  for (int i = 0; i < m->nM; i++) {
+    fprintf(fp, " %d", d->M_colind[i]);
+  }
+  fprintf(fp, "\n\n");
+
+  // mapM2M
+  fprintf(fp, NAME_FORMAT, "mapM2M");
+  for (int i = 0; i < m->nM; i++) {
+    fprintf(fp, " %d", d->mapM2M[i]);
+  }
+  fprintf(fp, "\n\n");
+
   // C sparse structure
-  printSparsity("C: reduced dof-dof matrix", m->nv, m->nv, d->C_rowadr, d->C_rownnz, d->C_colind, fp);
+  mj_printSparsity("C: reduced dof-dof matrix", m->nv, m->nv, d->C_rowadr, NULL, d->C_rownnz,
+                   NULL, d->C_colind, fp);
 
   fprintf(fp, NAME_FORMAT, "C_rownnz");
   for (int i = 0; i < m->nv; i++) {
@@ -1157,7 +1224,8 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   fprintf(fp, "\n\n");
 
   // D sparse structure
-  printSparsity("D: dof-dof matrix", m->nv, m->nv, d->D_rowadr, d->D_rownnz, d->D_colind, fp);
+  mj_printSparsity("D: dof-dof matrix", m->nv, m->nv,
+                   d->D_rowadr, d->D_diag, d->D_rownnz, NULL, d->D_colind, fp);
 
   // D_rownnz
   fprintf(fp, NAME_FORMAT, "D_rownnz");
@@ -1194,15 +1262,15 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   }
   fprintf(fp, "\n\n");
 
-  if (M) {
-    // print qDeriv
-    mju_sparse2dense(M, d->qDeriv, m->nv, m->nv, d->D_rownnz, d->D_rowadr, d->D_colind);
-    printArray("QDERIV", m->nv, m->nv, M, fp, float_format);
+  // print qDeriv
+  if (!mju_isZero(d->qDeriv, m->nD)) {
+    printSparse("QDERIV", d->qDeriv, m->nv, d->D_rownnz, d->D_rowadr, d->D_colind,
+                fp, float_format);
+  }
 
-    // print qLU
-    mju_sparse2dense(M, d->qLU, m->nv, m->nv, d->D_rownnz, d->D_rowadr,
-                    d->D_colind);
-    printArray("QLU", m->nv, m->nv, M, fp, float_format);
+  // print qLU
+  if (!mju_isZero(d->qLU, m->nD)) {
+    printSparse("QLU", d->qLU, m->nv, d->D_rownnz, d->D_rowadr, d->D_colind, fp, float_format);
   }
 
   // contact
@@ -1254,17 +1322,22 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
     printArray("EFC_J", d->nefc, m->nv, d->efc_J, fp, float_format);
     printArray("EFC_AR", d->nefc, d->nefc, d->efc_AR, fp, float_format);
   } else {
-    printSparsity("J: constraint Jacobian", d->nefc, m->nv,
-             d->efc_J_rowadr, d->efc_J_rownnz, d->efc_J_colind, fp);
+    mj_printSparsity("J: constraint Jacobian", d->nefc, m->nv, d->efc_J_rowadr, NULL,
+                     d->efc_J_rownnz, d->efc_J_rowsuper, d->efc_J_colind, fp);
     printArrayInt("EFC_J_ROWNNZ", d->nefc, 1, d->efc_J_rownnz, fp);
     printArrayInt("EFC_J_ROWADR", d->nefc, 1, d->efc_J_rowadr, fp);
     printSparse("EFC_J", d->efc_J, d->nefc, d->efc_J_rownnz,
                 d->efc_J_rowadr, d->efc_J_colind, fp, float_format);
-
-    printArrayInt("EFC_AR_ROWNNZ", d->nefc, 1, d->efc_AR_rownnz, fp);
-    printArrayInt("EFC_AR_ROWADR", d->nefc, 1, d->efc_AR_rowadr, fp);
-    printSparse("EFC_AR", d->efc_AR, d->nefc, d->efc_AR_rownnz,
-                d->efc_AR_rowadr, d->efc_AR_colind, fp, float_format);
+    mj_printSparsity("JT: constraint Jacobian transposed", m->nv, d->nefc, d->efc_JT_rowadr, NULL,
+                     d->efc_JT_rownnz, d->efc_JT_rowsuper, d->efc_JT_colind, fp);
+    if (mj_isDual(m)) {
+      printArrayInt("EFC_AR_ROWNNZ", d->nefc, 1, d->efc_AR_rownnz, fp);
+      printArrayInt("EFC_AR_ROWADR", d->nefc, 1, d->efc_AR_rowadr, fp);
+      printSparse("EFC_AR", d->efc_AR, d->nefc, d->efc_AR_rownnz,
+                  d->efc_AR_rowadr, d->efc_AR_colind, fp, float_format);
+      mj_printSparsity("efc_AR: inverse constraint inertia", d->nefc, d->nefc, d->efc_AR_rowadr,
+                       NULL, d->efc_AR_rownnz, NULL, d->efc_AR_colind, fp);
+    }
   }
 
   printArray("EFC_POS", d->nefc, 1, d->efc_pos, fp, float_format);
@@ -1386,8 +1459,6 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
   if (filename) {
     fclose(fp);
   }
-
-  mj_freeStack(d);
 }
 
 
@@ -1397,6 +1468,6 @@ void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
 
 
 // print mjData to text file
-void mj_printData(const mjModel* m, mjData* d, const char* filename) {
+void mj_printData(const mjModel* m, const mjData* d, const char* filename) {
   mj_printFormattedData(m, d, filename, FLOAT_FORMAT);
 }
