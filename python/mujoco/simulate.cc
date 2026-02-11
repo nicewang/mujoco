@@ -13,17 +13,21 @@
 // limitations under the License.
 
 #include <atomic>
-#include <chrono>
 #include <cstring>
 #include <memory>
+#include <stdexcept>
 #include <string>
-#include <thread>
+#include <thread>  // NOLINT(build/c++11)
+#include <tuple>
 #include <utility>
+#include <vector>
 
 #include <glfw_adapter.h>
 #include <glfw_dispatch.h>
 #include <simulate.h>
+#include <Python.h>
 #include "errors.h"
+#include "indexers.h"
 #include "structs.h"
 #include <pybind11/gil.h>
 #include <pybind11/pybind11.h>
@@ -98,10 +102,7 @@ class SimulateWrapper {
   }
 
   void WaitUntilExit() {
-    // TODO: replace with atomic wait when we migrate to C++20
-    while (simulate_ && simulate_->exitrequest.load() != 2) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    WaitForAtomicNoGil(simulate_->exitrequest, 2);
   }
 
   void Load(py::object m, py::object d, const std::string& path) {
@@ -134,21 +135,130 @@ class SimulateWrapper {
 
   void SetFigures(
       const std::vector<std::pair<mjrRect, py::object>>& viewports_figures) {
-    // Pairs of [viewport, figure], where viewport corresponds to the location
-    // of the figure on the viewer window.
-    std::vector<std::pair<mjrRect, mjvFigure>> user_figures;
-    for (const auto& [viewport, figure] : viewports_figures) {
-      mjvFigure casted_figure = *figure.cast<MjvFigureWrapper&>().get();
-      user_figures.push_back(std::make_pair(viewport, casted_figure));
+    if (WaitForAtomicNoGil(simulate_->newfigurerequest, 0)) {
+      return;
     }
 
-    // Set them all at once to prevent figure flickering.
-    simulate_->user_figures_ = user_figures;
+    // Pairs of [viewport, figure], where viewport corresponds to the location
+    // of the figure on the viewer window.
+    for (const auto& [viewport, figure] : viewports_figures) {
+      mjvFigure casted_figure = *figure.cast<MjvFigureWrapper&>().get();
+      simulate_->user_figures_new_.push_back(
+          std::make_pair(viewport, casted_figure));
+    }
+
+    int value = 0;
+    simulate_->newfigurerequest.compare_exchange_strong(value, 1);
   }
 
-  void ClearFigures() { simulate_->user_figures_.clear(); }
+  void ClearFigures() {
+    if (WaitForAtomicNoGil(simulate_->newfigurerequest, 0)) {
+      return;
+    }
+
+    simulate_->user_figures_new_.clear();
+
+    int value = 0;
+    simulate_->newfigurerequest.compare_exchange_strong(value, 1);
+  }
+
+  void SetTexts(
+      const std::vector<std::tuple<int, int, std::string, std::string>>&
+          texts) {
+    if (WaitForAtomicNoGil(simulate_->newtextrequest, 0)) {
+      return;
+    }
+
+    // Collection of [font, gridpos, text1, text2] tuples for overlay text
+    for (const auto& [font, gridpos, text1, text2] : texts) {
+      simulate_->user_texts_new_.push_back(
+          std::make_tuple(font, gridpos, text1, text2));
+    }
+
+    int value = 0;
+    simulate_->newtextrequest.compare_exchange_strong(value, 1);
+  }
+
+  void ClearTexts() {
+    if (WaitForAtomicNoGil(simulate_->newtextrequest, 0)) {
+      return;
+    }
+
+    simulate_->user_texts_new_.clear();
+
+    int value = 0;
+    simulate_->newtextrequest.compare_exchange_strong(value, 1);
+  }
+
+  void SetImages(
+    const std::vector<std::tuple<mjrRect, pybind11::array>> viewports_images
+  ) {
+    if (WaitForAtomicNoGil(simulate_->newimagerequest, 0)) {
+      return;
+    }
+
+    for (const auto& [viewport, image] : viewports_images) {
+      auto buf = image.request();
+      if (buf.ndim != 3) {
+        throw std::invalid_argument("image must have 3 dimensions (H, W, C)");
+      }
+      if (static_cast<int>(buf.shape[2]) != 3) {
+        throw std::invalid_argument("image must have 3 channels");
+      }
+      if (buf.itemsize != sizeof(unsigned char)) {
+        throw std::invalid_argument("image must be uint8 format");
+      }
+
+      // Calculate size of the image data
+      size_t height = buf.shape[0];
+      size_t width = buf.shape[1];
+      size_t size = height * width * 3;
+
+      // Make a copy of the image data since Python is
+      // not required to keep it
+      std::unique_ptr<unsigned char[]> image_copy(new unsigned char[size]());
+      std::memcpy(image_copy.get(), buf.ptr, size);
+
+      simulate_->user_images_new_.push_back(
+          std::make_tuple(viewport, std::move(image_copy)));
+    }
+
+    int value = 0;
+    simulate_->newimagerequest.compare_exchange_strong(value, 1);
+  }
+
+  void ClearImages() {
+    if (WaitForAtomicNoGil(simulate_->newimagerequest, 0)) {
+      return;
+    }
+
+    simulate_->user_images_new_.clear();
+
+    int value = 0;
+    simulate_->newimagerequest.compare_exchange_strong(value, 1);
+  }
 
  private:
+  // Waits for an atomic value to become the expected value, releasing the GIL
+  // during the wait to prevent deadlock with render thread's key callback which
+  // needs to acquire the GIL. Returns true if simulate_ is null i.e. the
+  // viewer has been destroyed during the wait and the caller should return.
+  bool WaitForAtomicNoGil(std::atomic_int& atomic, int expected) {
+    if (simulate_) {
+      py::gil_scoped_release no_gil;
+      while (atomic.load() != expected) {
+        // TODO(robotics-simulation): replace with `atomic.wait(expected)` when
+        // we migrate python bindings to C++20 (we may need to drop GCC 10).
+        std::this_thread::yield();
+      }
+    }
+
+    // Re-check after waiting because releasing the GIL allows other threads to
+    // run, including the thread which handles window close, hence simulate_
+    // could become invalid during the wait.
+    return simulate_ == nullptr;
+  }
+
   mujoco::Simulate* simulate_;
   std::atomic_int destroyed_ = 0;
 
@@ -238,6 +348,7 @@ PYBIND11_MODULE(_simulate, pymodule) {
            CallIfNotNull(&mujoco::Simulate::LoadMessageClear),
            py::call_guard<py::gil_scoped_release>())
       .def("sync", CallIfNotNull(&mujoco::Simulate::Sync),
+           py::arg("state_only") = false,
            py::call_guard<py::gil_scoped_release>())
       .def("add_to_history", CallIfNotNull(&mujoco::Simulate::AddToHistory),
            py::call_guard<py::gil_scoped_release>())
@@ -249,6 +360,11 @@ PYBIND11_MODULE(_simulate, pymodule) {
       .def("set_figures", &SimulateWrapper::SetFigures,
            py::arg("viewports_figures"))
       .def("clear_figures", &SimulateWrapper::ClearFigures)
+      .def("set_texts", &SimulateWrapper::SetTexts, py::arg("overlay_texts"))
+      .def("clear_texts", &SimulateWrapper::ClearTexts)
+      .def("set_images", &SimulateWrapper::SetImages,
+           py::arg("viewports_images"))
+      .def("clear_images", &SimulateWrapper::ClearImages)
       .def_property_readonly("m", &SimulateWrapper::GetModel)
       .def_property_readonly("d", &SimulateWrapper::GetData)
       .def_property_readonly("viewport", &SimulateWrapper::GetViewport)

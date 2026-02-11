@@ -91,6 +91,18 @@ Byte type used to represent boolean variables.
    typedef unsigned char mjtByte;
 
 
+.. _mjtSize:
+
+mjtSize
+^^^^^^^
+
+Size type used to represent buffer sizes.
+
+.. code-block:: C
+
+   typedef int64_t mjtSize;
+
+
 .. _tyEnums:
 
 Enum types
@@ -154,6 +166,16 @@ elements. These values are used in ``m->geom_type`` and ``m->site_type``.
 .. mujoco-include:: mjtGeom
 
 
+.. _mjtProjection:
+
+mjtProjection
+~~~~~~~~~~~~~
+
+Type of camera projection. Used in ``m->cam_projection``.
+
+.. mujoco-include:: mjtProjection
+
+
 .. _mjtCamLight:
 
 mjtCamLight
@@ -163,6 +185,17 @@ Dynamic modes for cameras and lights, specifying how the camera/light position a
 values are used in ``m->cam_mode`` and ``m->light_mode``.
 
 .. mujoco-include:: mjtCamLight
+
+
+.. _mjtLightType:
+
+mjtLightType
+~~~~~~~~~~~~
+
+The type of a light source describing how its position, orientation and other properties will interact with the
+objects in the scene. These values are used in ``m->light_type``.
+
+.. mujoco-include:: mjtLightType
 
 
 .. _mjtTexture:
@@ -184,6 +217,16 @@ Texture roles, specifying how the renderer should interpret the texture.  Note t
 uses RGB textures.  These values are used to store the texture index in the material's array ``m->mat_texid``.
 
 .. mujoco-include:: mjtTextureRole
+
+
+.. _mjtColorSpace:
+
+mjtColorSpace
+~~~~~~~~~~~~~
+
+Type of color space encoding for textures.
+
+.. mujoco-include:: mjtColorSpace
 
 
 .. _mjtIntegrator:
@@ -295,26 +338,6 @@ MuJoCo object types. These are used, for example, in the support functions :ref:
 .. mujoco-include:: mjtObj
 
 
-.. _mjtConstraint:
-
-mjtConstraint
-~~~~~~~~~~~~~
-
-Constraint types. These values are not used in mjModel, but are used in the mjData field ``d->efc_type`` when the list
-of active constraints is constructed at each simulation time step.
-
-.. mujoco-include:: mjtConstraint
-
-.. _mjtConstraintState:
-
-mjtConstraintState
-~~~~~~~~~~~~~~~~~~
-
-These values are used by the solver internally to keep track of the constraint states.
-
-.. mujoco-include:: mjtConstraintState
-
-
 .. _mjtSensor:
 
 mjtSensor
@@ -346,6 +369,16 @@ These are the possible sensor data types, used in ``mjData.sensor_datatype``.
 .. mujoco-include:: mjtDataType
 
 
+.. _mjtConDataField:
+
+mjtConDataField
+~~~~~~~~~~~~~~~
+
+Types of data fields returned by contact sensors.
+
+.. mujoco-include:: mjtConDataField
+
+
 .. _mjtSameFrame:
 
 mjtSameFrame
@@ -355,6 +388,37 @@ Types of frame alignment of elements with their parent bodies. Used as shortcuts
 last argument to :ref:`mj_local2global`.
 
 .. mujoco-include:: mjtSameFrame
+
+
+.. _mjtSleepPolicy:
+
+mjtSleepPolicy
+~~~~~~~~~~~~~~
+
+Sleep policy associated with a tree. The compiler automatically chooses between ``NEVER`` and ``ALLOWED``, but the user
+can override this choice. Only the user can set the ``INIT`` policy (initialized as asleep).
+
+.. mujoco-include:: mjtSleepPolicy
+
+
+.. _mjtFlexSelf:
+
+mjtFlexSelf
+~~~~~~~~~~~~
+
+Types of flex self-collisions midphase.
+
+.. mujoco-include:: mjtFlexSelf
+
+
+.. _mjtSDFType:
+
+mjtSDFType
+~~~~~~~~~~~
+
+Formulas used to combine SDFs when calling mjc_distance and mjc_gradient.
+
+.. mujoco-include:: mjtSDFType
 
 
 .. _tyDataEnums:
@@ -375,6 +439,27 @@ State component elements as integer bitflags and several convenient combinations
 :ref:`mj_getState`, :ref:`mj_setState` and :ref:`mj_stateSize`.
 
 .. mujoco-include:: mjtState
+
+
+.. _mjtConstraint:
+
+mjtConstraint
+~~~~~~~~~~~~~
+
+Constraint types. These values are not used in mjModel, but are used in the mjData field ``d->efc_type`` when the list
+of active constraints is constructed at each simulation time step.
+
+.. mujoco-include:: mjtConstraint
+
+
+.. _mjtConstraintState:
+
+mjtConstraintState
+~~~~~~~~~~~~~~~~~~
+
+These values are used by the solver internally to keep track of the constraint states.
+
+.. mujoco-include:: mjtConstraintState
 
 
 .. _mjtWarning:
@@ -398,6 +483,15 @@ Timer types. The number of timer types is given by ``mjNTIMER`` which is also th
 
 .. mujoco-include:: mjtTimer
 
+
+.. _mjtSleepState:
+
+mjtSleepState
+~~~~~~~~~~~~~
+
+Sleep state of an object.
+
+.. mujoco-include:: mjtSleepState
 
 
 .. _tyVisEnums:
@@ -883,7 +977,7 @@ mjSolverStat
 
 This is the data structure holding information about one solver iteration. ``mjData.solver`` is a preallocated array
 of mjSolverStat data structures, one for each iteration of the solver, up to a maximum of mjNSOLVER. The actual number
-of solver iterations is given by ``mjData.solver_iter``.
+of solver iterations is given by ``mjData.solver_niter``.
 
 .. mujoco-include:: mjSolverStat
 
@@ -965,17 +1059,6 @@ mjvScene
 This structure contains everything needed to render the 3D scene in OpenGL.
 
 .. mujoco-include:: mjvScene
-
-
-.. _mjvSceneState:
-
-mjvSceneState
-~~~~~~~~~~~~~
-
-This structure contains the portions of :ref:`mjModel` and :ref:`mjData` that are required for
-various ``mjv_*`` functions.
-
-.. mujoco-include:: mjvSceneState
 
 
 .. _mjvFigure:

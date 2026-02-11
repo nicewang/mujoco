@@ -243,6 +243,27 @@ TEST_F(UserFlexTest, RigidFlex) {
   mj_deleteModel(m);
   mj_deleteData(d);
 }
+
+TEST_F(UserFlexTest, FlexNotCollide) {
+  static constexpr char xml[] = R"(
+  <mujoco>
+    <worldbody>
+      <flexcomp name="test" pos="1 0 -1" type="grid"
+                count="5 5 5" spacing="1 1 1" dim="3">
+        <contact contype="0" conaffinity="0"/>
+      </flexcomp>
+    </worldbody>
+  </mujoco>
+  )";
+  std::array<char, 1024> error;
+  mjModel* m = LoadModelFromString(xml, error.data(), error.size());
+  ASSERT_THAT(m, NotNull()) << error.data();
+  mjData* d = mj_makeData(m);
+  mj_step(m, d);
+  mj_deleteModel(m);
+  mj_deleteData(d);
+}
+
 TEST_F(UserFlexTest, BoundingBoxCoordinates) {
   static constexpr char xml[] = R"(
   <mujoco>
@@ -697,6 +718,18 @@ TEST_F(UserFlexTest, LoadMSHASCII_41_MissingElement_Fail) {
   mj_deleteModel(m);
 }
 
+TEST_F(UserFlexTest,
+       LoadMSHASCII_41_MismatchBetweenMaxNodesAndNodesInBlock_Fail) {
+  const std::string xml_path =
+      GetTestDataFilePath(
+          "user/testdata/malformed_cube_41_ascii_mismatch_between_max_nodes_and_nodes_in_block.xml");
+  std::array<char, 1024> error;
+  mjModel* m = mj_loadXML(xml_path.c_str(), 0, error.data(), error.size());
+  EXPECT_THAT(error.data(), HasSubstr(
+        "XML Error: Error: Maximum number of nodes must be equal to number of nodes in a block\nElement 'flexcomp', line 22\n"));
+  mj_deleteModel(m);
+}
+
 TEST_F(UserFlexTest, LoadMSHASCII_22_MissingNumNodes_Fail) {
   const std::string xml_path =
       GetTestDataFilePath(
@@ -750,6 +783,56 @@ TEST_F(UserFlexTest, LoadMSHASCII_dim_missing_in_xml) {
   std::array<char, 1024> error;
   mjModel* m = mj_loadXML(xml_path.c_str(), 0, error.data(), error.size());
   EXPECT_EQ(m->flex_dim[0], 3);
+  mj_deleteModel(m);
+}
+
+TEST_F(UserFlexTest, TrilinearUnusedVertices_Crash) {
+  // This XML defines 5 points but only uses 4 in the element.
+  // The last point (2 2 2) is unused.
+  static constexpr char xml[] = R"(
+  <mujoco>
+  <worldbody>
+    <flexcomp name="test" type="direct"
+              point="0 0 0  1 0 0  0 1 0  0 0 1  2 2 2"
+              element="0 1 2 3"
+              dof="trilinear" dim="3">
+      <contact selfcollide="none"/>
+    </flexcomp>
+  </worldbody>
+  </mujoco>
+  )";
+  std::array<char, 1024> error;
+  mjModel* m = LoadModelFromString(xml, error.data(), error.size());
+  ASSERT_THAT(m, testing::NotNull()) << error.data();
+  mj_deleteModel(m);
+}
+
+TEST_F(UserFlexTest, MeshNodePinning) {
+  static constexpr char xml[] = R"(
+  <mujoco>
+  <worldbody>
+    <flexcomp name="test" type="direct"
+              point="0 0 0  1 0 0  0 1 0  0 0 1  2 2 2"
+              element="0 1 2 3"
+              dof="trilinear" dim="3">
+      <contact selfcollide="none"/>
+      <pin id="0"/>
+    </flexcomp>
+  </worldbody>
+  </mujoco>
+  )";
+  std::array<char, 1024> error;
+  mjModel* m = LoadModelFromString(xml, error.data(), error.size());
+  ASSERT_THAT(m, testing::NotNull()) << error.data();
+
+  // Verify that node 0 (corner) is pinned
+  // Trilinear 3D has 8 nodes.
+  // If 0 are pinned, we get 8 bodies.
+  // If 1 is pinned, we get 7 bodies (created) + 1 existing (the parent).
+  // m->nbody should reflect this. Flex bodies are added to the model.
+  // Model has 1 world body + flex bodies.
+  EXPECT_EQ(m->nbody, 1 + 7);  // 1 world + 7 flex nodes (1 pinned)
+
   mj_deleteModel(m);
 }
 

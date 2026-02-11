@@ -17,6 +17,7 @@
 
 #include <mujoco/mjdata.h>
 #include <mujoco/mjmodel.h>
+#include <mujoco/mjspec.h>
 #include <mujoco/mjtnum.h>
 #include <mujoco/mjvisualize.h>
 
@@ -26,6 +27,7 @@
 struct mjResource_ {
   char* name;                                   // name of resource (filename, etc)
   void* data;                                   // opaque data pointer
+  mjVFS* vfs;                                   // pointer to the VFS
   char timestamp[512];                          // timestamp of the resource
   const struct mjpResourceProvider* provider;   // pointer to the provider
 };
@@ -41,9 +43,11 @@ typedef int (*mjfReadResource)(mjResource* resource, const void** buffer);
 // callback for closing a resource (responsible for freeing any allocated memory)
 typedef void (*mjfCloseResource)(mjResource* resource);
 
-// callback for returning the directory of a resource
-// sets dir to directory string with ndir being size of directory string
-typedef void (*mjfGetResourceDir)(mjResource* resource, const char** dir, int* ndir);
+// callback for mounting a resource (provider), returns zero on failure
+typedef int (*mjfMountResource)(mjResource* resource);
+
+// callback for unmounting a resource (provider), returns zero on failure
+typedef int (*mjfUnmountResource)(mjResource* resource);
 
 // callback for checking if the current resource was modified from the time
 // specified by the timestamp
@@ -58,12 +62,32 @@ struct mjpResourceProvider {
   mjfOpenResource open;             // opening callback
   mjfReadResource read;             // reading callback
   mjfCloseResource close;           // closing callback
-  mjfGetResourceDir getdir;         // get directory callback (optional)
+  mjfMountResource mount;           // mounting callback (optional)
+  mjfUnmountResource unmount;       // unmounting callback (optional)
   mjfResourceModified modified;     // resource modified callback (optional)
   void* data;                       // opaque data pointer (resource invariant)
 };
 typedef struct mjpResourceProvider mjpResourceProvider;
 
+//---------------------------------- Decoder -------------------------------------------------------
+
+// function pointer types
+// return an mjSpec representing the decoded resource.
+typedef mjSpec* (*mjfDecode)(mjResource* resource, const mjVFS* vfs);
+// return true if the given resource can be decoded.
+typedef int (*mjfCanDecode)(const mjResource* resource);
+
+// the struct defining the decoder plugin's interface
+struct mjpDecoder {
+  const char* content_type;
+  const char* extension;
+  // user-facing functions
+  mjfCanDecode can_decode;  // quickly check if this decoder can handle the resource
+  mjfDecode decode;         // main decoding function
+  // the caller takes ownership of the spec returned by decode and is responsible
+  // for cleaning it up
+};
+typedef struct mjpDecoder mjpDecoder;
 
 //---------------------------------- Plugins -------------------------------------------------------
 
@@ -134,6 +158,16 @@ struct mjpPlugin_ {
   void (*sdf_aabb)(mjtNum aabb[6], const mjtNum* attributes);
 };
 typedef struct mjpPlugin_ mjpPlugin;
+
+struct mjSDF_ {
+  const mjpPlugin** plugin;
+  int* id;
+  mjtSDFType type;
+  mjtNum* relpos;
+  mjtNum* relmat;
+  mjtGeom* geomtype;
+};
+typedef struct mjSDF_ mjSDF;
 
 #if defined(__has_attribute)
 

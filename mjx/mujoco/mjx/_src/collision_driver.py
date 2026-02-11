@@ -71,11 +71,16 @@ from mujoco.mjx._src.collision_sdf import sphere_ellipsoid
 from mujoco.mjx._src.collision_types import FunctionKey
 from mujoco.mjx._src.types import Contact
 from mujoco.mjx._src.types import Data
+from mujoco.mjx._src.types import DataJAX
 from mujoco.mjx._src.types import DisableBit
 from mujoco.mjx._src.types import GeomType
+from mujoco.mjx._src.types import Impl
 from mujoco.mjx._src.types import Model
+from mujoco.mjx._src.types import ModelJAX
+from mujoco.mjx._src.types import OptionJAX
 # pylint: enable=g-importing-member
 import numpy as np
+
 
 # pair-wise collision functions
 _COLLISION_FUNC = {
@@ -108,6 +113,8 @@ _COLLISION_FUNC = {
     (GeomType.MESH, GeomType.MESH): convex_convex,
 }
 
+# Maximum constraint dimension for collision functions.
+_MAX_NCON = 8
 
 # geoms for which we ignore broadphase
 _GEOM_NO_BROADPHASE = {GeomType.HFIELD, GeomType.PLANE}
@@ -227,7 +234,7 @@ def _geom_groups(
     if types[0] == mujoco.mjtGeom.mjGEOM_HFIELD:
       # add static grid bounds to the grouping key for hfield collisions
       geom_rbound_hfield = (
-          m.geom_rbound_hfield if isinstance(m, Model) else m.geom_rbound
+          m._impl.geom_rbound_hfield if isinstance(m, Model) else m.geom_rbound  # pytype: disable=attribute-error
       )
       nrow, ncol = m.hfield_nrow[data_ids[0]], m.hfield_ncol[data_ids[0]]
       xsize, ysize = m.hfield_size[data_ids[0]][:2]
@@ -323,11 +330,11 @@ def _contact_groups(m: Model, d: Data) -> Dict[FunctionKey, Contact]:
         solref=solref,
         solreffriction=solreffriction,
         solimp=solimp,
-        dim=d.contact.dim,
+        dim=d._impl.contact.dim,  # pytype: disable=attribute-error
         geom1=jp.array(geom[:, 0]),
         geom2=jp.array(geom[:, 1]),
         geom=jp.array(geom[:, :2]),
-        efc_address=d.contact.efc_address,
+        efc_address=d._impl.contact.efc_address,  # pytype: disable=attribute-error
     )
 
   return groups
@@ -338,8 +345,23 @@ def _numeric(m: Union[Model, mujoco.MjModel], name: str) -> int:
   return int(m.numeric_data[id_]) if id_ >= 0 else -1
 
 
-def make_condim(m: Union[Model, mujoco.MjModel]) -> np.ndarray:
+def make_condim(
+    m: Union[Model, mujoco.MjModel], impl: Impl = Impl.JAX
+) -> np.ndarray:
   """Returns the dims of the contacts for a Model."""
+  if impl not in (Impl.JAX, Impl.C):
+    raise ValueError('make_condim only supports JAX and C backends.')
+
+  if isinstance(m, mujoco.MjModel):
+    sdf_initpoints = m.opt.sdf_initpoints
+  elif isinstance(m.opt._impl, OptionJAX):
+    sdf_initpoints = m.opt._impl.sdf_initpoints
+  else:
+    raise ValueError(
+        'make_condim requires mujoco.MjModel or mjx.Model with JAX backend'
+        ' implementation.'
+    )
+
   if m.opt.disableflags & DisableBit.CONTACT:
     return np.empty(0, dtype=int)
 
@@ -361,8 +383,20 @@ def make_condim(m: Union[Model, mujoco.MjModel]) -> np.ndarray:
 
   condim_counts = {}
   for k, v in group_counts.items():
-    func = _COLLISION_FUNC[k.types]
-    num_contacts = condim_counts.get(k.condim, 0) + func.ncon * v  # pytype: disable=attribute-error
+    if k.types[1] == mujoco.mjtGeom.mjGEOM_SDF:
+      ncon = sdf_initpoints
+    else:
+      func = _COLLISION_FUNC.get(k.types, None)
+      if func is not None:
+        ncon = func.ncon  # pytype: disable=attribute-error
+      elif impl == Impl.C:
+        ncon = _MAX_NCON
+      else:
+        raise ValueError(
+            f'Collision function not found for geom types {k.types[0]},',
+            f'{k.types[1]}'
+        )
+    num_contacts = condim_counts.get(k.condim, 0) + ncon * v
     if max_contact_points > -1:
       num_contacts = min(max_contact_points, num_contacts)
     condim_counts[k.condim] = num_contacts
@@ -374,7 +408,10 @@ def make_condim(m: Union[Model, mujoco.MjModel]) -> np.ndarray:
 
 def collision(m: Model, d: Data) -> Data:
   """Collides geometries."""
-  if d.ncon == 0:
+  if not isinstance(m._impl, ModelJAX) or not isinstance(d._impl, DataJAX):
+    raise ValueError('collision requires JAX backend implementation.')
+
+  if d._impl.ncon == 0:  # pytype: disable=attribute-error
     return d
 
   max_geom_pairs = _numeric(m, 'max_geom_pairs')
@@ -424,4 +461,4 @@ def collision(m: Model, d: Data) -> Data:
   contacts = sum([condim_groups[k] for k in sorted(condim_groups)], [])
   contact = jax.tree_util.tree_map(lambda *x: jp.concatenate(x), *contacts)
 
-  return d.replace(contact=contact)
+  return d.tree_replace({'_impl.contact': contact})

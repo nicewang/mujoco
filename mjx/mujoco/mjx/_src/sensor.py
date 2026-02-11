@@ -23,15 +23,18 @@ from mujoco.mjx._src import ray
 from mujoco.mjx._src import smooth
 from mujoco.mjx._src import support
 from mujoco.mjx._src.types import Data
+from mujoco.mjx._src.types import DataJAX
 from mujoco.mjx._src.types import DisableBit
 from mujoco.mjx._src.types import Model
+from mujoco.mjx._src.types import ModelJAX
 from mujoco.mjx._src.types import ObjType
 from mujoco.mjx._src.types import SensorType
+from mujoco.mjx._src.types import TrnType
 # pylint: enable=g-importing-member
 import numpy as np
 
 
-def apply_cutoff(
+def _apply_cutoff(
     sensor: jax.Array, cutoff: jax.Array, data_type: int
 ) -> jax.Array:
   """Clip sensor to cutoff value."""
@@ -50,6 +53,8 @@ def apply_cutoff(
 
 def sensor_pos(m: Model, d: Data) -> Data:
   """Compute position-dependent sensors values."""
+  if not isinstance(m._impl, ModelJAX) or not isinstance(d._impl, DataJAX):
+    raise ValueError('sensor_pos requires JAX backend implementation.')
 
   if m.opt.disableflags & DisableBit.SENSOR:
     return d
@@ -162,7 +167,7 @@ def sensor_pos(m: Model, d: Data) -> Data:
         sensor, _ = jax.vmap(
             ray.ray, in_axes=(None, None, 0, 0, None, None, None)
         )(m, d, site_xpos, site_mat, (), True, sid)
-        sensors.append(apply_cutoff(sensor, cutoffs, data_type[0]))
+        sensors.append(_apply_cutoff(sensor, cutoffs, data_type[0]))
         adrs.append(adr[idxs])
       continue  # avoid adding to sensors/adrs list a second time
     elif sensor_type == SensorType.JOINTPOS:
@@ -193,7 +198,7 @@ def sensor_pos(m: Model, d: Data) -> Data:
         cutofft = cutoff[idxt]
         sensor = jax.vmap(_framepos)(xpos, xpos_ref, xmat_ref, refidt)
         adrt = adr[idxt, None] + np.arange(3)[None]
-        sensors.append(apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
+        sensors.append(_apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
         adrs.append(adrt.reshape(-1))
       continue  # avoid adding to sensors/adrs list a second time
     elif sensor_type in frame_axis:
@@ -213,7 +218,7 @@ def sensor_pos(m: Model, d: Data) -> Data:
         cutofft = cutoff[idxt]
         sensor = jax.vmap(_frameaxis)(xmat, xmat_ref, refidt)
         adrt = adr[idxt, None] + np.arange(3)[None]
-        sensors.append(apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
+        sensors.append(_apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
         adrs.append(adrt.reshape(-1))
       continue  # avoid adding to sensors/adrs list a second time
     elif sensor_type == SensorType.FRAMEQUAT:
@@ -254,7 +259,7 @@ def sensor_pos(m: Model, d: Data) -> Data:
             )
         )(quat, refquat, refidt)
         adrt = adr[idxt, None] + np.arange(4)[None]
-        sensors.append(apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
+        sensors.append(_apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
         adrs.append(adrt.reshape(-1))
       continue  # avoid adding to sensors/adrs list a second time
     elif sensor_type == SensorType.SUBTREECOM:
@@ -266,7 +271,7 @@ def sensor_pos(m: Model, d: Data) -> Data:
       # TODO(taylorhowell): raise error after adding sensor check to io.py
       continue  # unsupported sensor type
 
-    sensors.append(apply_cutoff(sensor, cutoff, data_type[0]).reshape(-1))
+    sensors.append(_apply_cutoff(sensor, cutoff, data_type[0]).reshape(-1))
     adrs.append(adr)
 
   if not adrs:
@@ -281,6 +286,8 @@ def sensor_pos(m: Model, d: Data) -> Data:
 
 def sensor_vel(m: Model, d: Data) -> Data:
   """Compute velocity-dependent sensors values."""
+  if not isinstance(m._impl, ModelJAX) or not isinstance(d._impl, DataJAX):
+    raise ValueError('sensor_vel requires JAX backend implementation.')
 
   if m.opt.disableflags & DisableBit.SENSOR:
     return d
@@ -332,9 +339,9 @@ def sensor_vel(m: Model, d: Data) -> Data:
     elif sensor_type == SensorType.JOINTVEL:
       sensor = d.qvel[m.jnt_dofadr[objid]]
     elif sensor_type == SensorType.TENDONVEL:
-      sensor = d.ten_velocity[objid]
+      sensor = d._impl.ten_velocity[objid]
     elif sensor_type == SensorType.ACTUATORVEL:
-      sensor = d.actuator_velocity[objid]
+      sensor = d._impl.actuator_velocity[objid]
     elif sensor_type == SensorType.BALLANGVEL:
       jnt_dotadr = m.jnt_dofadr[objid, None] + np.arange(3)[None]
       sensor = d.qvel[jnt_dotadr]
@@ -392,20 +399,20 @@ def sensor_vel(m: Model, d: Data) -> Data:
 
         adrt = adr[idxt, None] + np.arange(3)[None]
 
-        sensors.append(apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
+        sensors.append(_apply_cutoff(sensor, cutofft, data_type[0]).reshape(-1))
         adrs.append(adrt.reshape(-1))
       continue  # avoid adding to sensors/adrs list a second time
     elif sensor_type == SensorType.SUBTREELINVEL:
-      sensor = d.subtree_linvel[objid]
+      sensor = d._impl.subtree_linvel[objid]
       adr = (adr[:, None] + np.arange(3)[None]).reshape(-1)
     elif sensor_type == SensorType.SUBTREEANGMOM:
-      sensor = d.subtree_angmom[objid]
+      sensor = d._impl.subtree_angmom[objid]
       adr = (adr[:, None] + np.arange(3)[None]).reshape(-1)
     else:
       # TODO(taylorhowell): raise error after adding sensor check to io.py
       continue  # unsupported sensor type
 
-    sensors.append(apply_cutoff(sensor, cutoff, data_type[0]).reshape(-1))
+    sensors.append(_apply_cutoff(sensor, cutoff, data_type[0]).reshape(-1))
     adrs.append(adr)
 
   if not adrs:
@@ -420,6 +427,8 @@ def sensor_vel(m: Model, d: Data) -> Data:
 
 def sensor_acc(m: Model, d: Data) -> Data:
   """Compute acceleration/force-dependent sensors values."""
+  if not isinstance(m._impl, ModelJAX) or not isinstance(d._impl, DataJAX):
+    raise ValueError('sensor_acc requires JAX backend implementation.')
 
   if m.opt.disableflags & DisableBit.SENSOR:
     return d
@@ -441,8 +450,29 @@ def sensor_acc(m: Model, d: Data) -> Data:
       SensorType.ACCELEROMETER,
       SensorType.FORCE,
       SensorType.TORQUE,
+      SensorType.FRAMELINACC,
+      SensorType.FRAMEANGACC,
   }:
     d = smooth.rne_postconstraint(m, d)
+
+  contact_intprm = m.sensor_intprm[m.sensor_type == SensorType.CONTACT]
+  contact_maxforce = (contact_intprm[:, 1] == 2).any()
+  contact_dataforce = (contact_intprm[:, 0] & (1 << 1)).any()
+  contact_datatorque = (contact_intprm[:, 0] & (1 << 2)).any()
+  if (m.sensor_type[stage_acc] == SensorType.TOUCH).any() | (
+      (m.sensor_type[stage_acc] == SensorType.CONTACT).any()
+      and (contact_maxforce | contact_dataforce | contact_datatorque)
+  ):
+    # compute contact forces
+    contact_force = []
+    condim_ids = []
+    for dim in set(d._impl.contact.dim):
+      force, condim_id = support.contact_force_dim(m, d, dim)
+      contact_force.append(force)
+      condim_ids.append(condim_id)
+    contact_force = jp.concatenate(contact_force)[
+        np.argsort(np.concatenate(condim_ids))
+    ]
 
   sensors, adrs = [], []
 
@@ -454,17 +484,8 @@ def sensor_acc(m: Model, d: Data) -> Data:
     data_type = m.sensor_datatype[idx]
 
     if sensor_type == SensorType.TOUCH:
-      # compute contact forces
-      forces = []
-      condim_ids = []
-      for dim in set(d.contact.dim):
-        force, condim_id = support.contact_force_dim(m, d, dim)
-        forces.append(force)
-        condim_ids.append(condim_id)
-      forces = jp.concatenate(forces)[np.argsort(np.concatenate(condim_ids))]
-
       # get bodies of contact geoms
-      conbody = jp.array(m.geom_bodyid)[d.contact.geom]
+      conbody = jp.array(m.geom_bodyid)[d._impl.contact.geom]
 
       # get site information
       site_bodyid = m.site_bodyid[objid]
@@ -474,12 +495,14 @@ def sensor_acc(m: Model, d: Data) -> Data:
       site_type = m.site_type[objid]
       conbody0 = site_bodyid[:, None] == conbody[:, 0]
       conbody1 = site_bodyid[:, None] == conbody[:, 1]
-      contacts = (d.contact.efc_address >= 0)[None] & (conbody0 | conbody1)
+      contacts = (d._impl.contact.efc_address >= 0)[None] & (
+          conbody0 | conbody1
+      )
 
       # compute conray, flip if second body
       conray = jax.vmap(
           lambda frame, force: math.normalize(frame[0] * force[0])
-      )(d.contact.frame, forces)
+      )(d._impl.contact.frame, contact_force)
       conray = jp.where(conbody1[..., None], -conray, conray)
 
       # compute distance, mapping over sites and contacts
@@ -501,7 +524,7 @@ def sensor_acc(m: Model, d: Data) -> Data:
             site_xpos[dist_id_site],
             site_xmat[dist_id_site],
             st,
-            d.contact.pos,
+            d._impl.contact.pos,
             conray[dist_id_site],
         )
         dist.append(jp.where(jp.isinf(dist_site), 0, dist_site))
@@ -509,7 +532,160 @@ def sensor_acc(m: Model, d: Data) -> Data:
       dist = jp.vstack(dist)[np.argsort(np.concatenate(dist_id))]
 
       # accumulate normal forces for each site
-      sensor = jp.dot((dist > 0) & contacts, forces[:, 0])
+      sensor = jp.dot((dist > 0) & contacts, contact_force[:, 0])
+    elif sensor_type == SensorType.CONTACT:
+      # maximum number of contacts
+      ncon = d._impl.ncon
+
+      # active contacts
+      dist = d._impl.contact.dist
+      pos = dist - d._impl.contact.includemargin
+      is_contact = pos < 0
+
+      # reduction criteria
+      if contact_maxforce:
+        # compute force magnitude for each contact
+        force_mag = jax.vmap(
+            lambda forcetorque: jp.dot(forcetorque[:3], forcetorque[:3])
+        )(contact_force)
+
+      def _reduce(reduction, mask):
+        if reduction == 1:  # mindist
+          return jp.argsort(pos * mask, descending=False)
+        if reduction == 2:  # maxforce
+          return jp.argsort(force_mag * mask, descending=True)
+        return jp.arange(mask.size)
+
+      # number of data elements per slot
+      def nslotdata(dataspec):
+        size = 0
+        # found, force, torque, dist, pos, normal, tangent
+        # TODO(taylorhowell): get sizes from mjCONDATA_SIZE
+        for i, size_i in enumerate([1, 3, 3, 1, 3, 3, 3]):
+          if dataspec & (1 << i):
+            size += size_i
+        return size
+
+      dataspecs, reduces, _ = m.sensor_intprm[idx].T
+      dims = m.sensor_dim[idx]
+      objtypes = m.sensor_objtype[idx]
+      refid = m.sensor_refid[idx]
+      reftypes = m.sensor_reftype[idx]
+
+      for dataspec, reduce, objtype, reftype, dim in set(
+          zip(dataspecs, reduces, objtypes, reftypes, dims)
+      ):
+        idx_ds = (
+            (dataspec == dataspecs)
+            & (reduce == reduces)
+            & (objtype == objtypes)
+            & (reftype == reftypes)
+            & (dim == dims)
+        )
+
+        # TODO(taylorhowell): site filter
+
+        size = nslotdata(dataspec)
+        num = np.minimum(int(dim / size), ncon)
+        nsensor = idx_ds.sum()
+
+        if objtype == ObjType.UNKNOWN and reftype == ObjType.UNKNOWN:
+          # all contacts match
+          match = np.ones(ncon, dtype=np.bool)
+
+          # matched and reduced contact ids
+          sort = _reduce(reduce, match)
+          cid = sort[:num]
+
+          # number of contacts per sensor
+          nfound = sum(is_contact)
+
+          # if duplicate sensor
+          cid = jp.tile(cid, (nsensor,))
+          nfound = jp.tile(nfound, (nsensor,))
+          flip = jp.ones((cid.size, 3))
+        elif objtype == ObjType.GEOM or reftype == ObjType.GEOM:
+          sensorid1 = objid[idx_ds]
+          sensorid2 = refid[idx_ds]
+          geomid0 = d._impl.contact.geom[:, 0]
+          geomid1 = d._impl.contact.geom[:, 1]
+
+          # match sensor ids and contact geom ids
+          geom0id1 = geomid0 == sensorid1[:, None]
+          geom0id2 = geomid0 == sensorid2[:, None]
+          geom1id1 = geomid1 == sensorid1[:, None]
+          geom1id2 = geomid1 == sensorid2[:, None]
+
+          if objtype == ObjType.GEOM and reftype == ObjType.UNKNOWN:  # geom1
+            mask12 = geom0id1
+            mask21 = geom1id1
+          elif objtype == ObjType.UNKNOWN and reftype == ObjType.GEOM:  # geom2
+            mask12 = geom0id2
+            mask21 = geom1id2
+          else:  # geom1, geom2
+            mask12 = geom0id1 & geom1id2
+            mask21 = geom0id2 & geom1id1
+
+          match = mask12 | mask21
+
+          # matched and reduced contact ids
+          cid = jax.vmap(lambda x: _reduce(reduce, x))(match)[:, :num]
+          cid = cid.reshape(-1)
+
+          # flip direction for force, torque, normal, tangent
+          if reftype == ObjType.UNKNOWN:  # geom1
+            is_flip = (geomid1[cid] == np.repeat(sensorid1, num))[:, None]
+          elif objtype == ObjType.UNKNOWN:  # geom2
+            is_flip = (geomid0[cid] == np.repeat(sensorid2, num))[:, None]
+          else:  # geom1, geom2
+            is_flip = np.repeat(sensorid1 > sensorid2, num)[:, None]
+
+          flip = jp.where(
+              is_flip,
+              jp.array([[1, 1, -1]]),
+              jp.array([[1, 1, 1]]),
+          )
+
+          # number of contacts per sensor
+          nfound = (match * is_contact[None, :]).sum(axis=1)
+
+        # TODO(taylorhowell): matching criteria: body, subtree
+
+        else:
+          raise NotImplementedError(
+              f'Unsupported contact sensor semantics: {objtype} {reftype}.'
+          )
+
+        slot = []
+
+        if dataspec & (1 << 0):  # found
+          slot.append(jp.repeat(nfound, num)[:, None])
+
+        if dataspec & (1 << 1):  # force
+          slot.append(flip * contact_force[cid, :3])
+
+        if dataspec & (1 << 2):  # torque
+          slot.append(flip * contact_force[cid, 3:])
+
+        if dataspec & (1 << 3):  # dist
+          slot.append(dist[cid, None])
+
+        if dataspec & (1 << 4):  # pos
+          slot.append(d._impl.contact.pos[cid])
+
+        if dataspec & (1 << 5):  # normal
+          slot.append(flip[:, 2, None] * d._impl.contact.frame[cid, 0])
+
+        if dataspec & (1 << 6):  # tangent
+          slot.append(flip[:, 2, None] * d._impl.contact.frame[cid, 1])
+
+        found = jp.tile(jp.arange(num), nsensor) < jp.repeat(nfound, num)
+        sensors.append((found[:, None] * jp.hstack(slot)).reshape(-1))
+        adrs.append(
+            (adr[idx_ds][:, None] + np.arange(num * size)[None]).reshape(-1)
+        )
+      continue  # avoid adding to sensors/adrs list a second time
+
     elif sensor_type == SensorType.ACCELEROMETER:
 
       @jax.vmap
@@ -523,14 +699,14 @@ def sensor_acc(m: Model, d: Data) -> Data:
       bodyid = m.site_bodyid[objid]
       rot = d.site_xmat[objid]
       cvel = d.cvel[bodyid]
-      cacc = d.cacc[bodyid]
+      cacc = d._impl.cacc[bodyid]
       dif = d.site_xpos[objid] - d.subtree_com[m.body_rootid[bodyid]]
 
       sensor = _accelerometer(cvel, cacc, dif, rot)
       adr = (adr[:, None] + np.arange(3)[None]).reshape(-1)
     elif sensor_type == SensorType.FORCE:
       bodyid = m.site_bodyid[objid]
-      cfrc_int = d.cfrc_int[bodyid]
+      cfrc_int = d._impl.cfrc_int[bodyid]
       site_xmat = d.site_xmat[objid]
       sensor = jax.vmap(lambda mat, vec: mat.T @ vec)(
           site_xmat, cfrc_int[:, 3:]
@@ -539,7 +715,7 @@ def sensor_acc(m: Model, d: Data) -> Data:
     elif sensor_type == SensorType.TORQUE:
       bodyid = m.site_bodyid[objid]
       rootid = m.body_rootid[bodyid]
-      cfrc_int = d.cfrc_int[bodyid]
+      cfrc_int = d._impl.cfrc_int[bodyid]
       site_xmat = d.site_xmat[objid]
       dif = d.site_xpos[objid] - d.subtree_com[rootid]
       sensor = jax.vmap(
@@ -550,6 +726,15 @@ def sensor_acc(m: Model, d: Data) -> Data:
       sensor = d.actuator_force[objid]
     elif sensor_type == SensorType.JOINTACTFRC:
       sensor = d.qfrc_actuator[m.jnt_dofadr[objid]]
+    elif sensor_type == SensorType.TENDONACTFRC:
+      force_mask = [
+          (m.actuator_trntype == TrnType.TENDON)
+          & (m.actuator_trnid[:, 0] == tendon_id)
+          for tendon_id in objid
+      ]
+      force_ids = np.concatenate([np.nonzero(mask)[0] for mask in force_mask])
+      force_mat = np.array(force_mask)[:, force_ids]
+      sensor = force_mat @ d.actuator_force[force_ids]
     elif sensor_type in (SensorType.FRAMELINACC, SensorType.FRAMEANGACC):
       objtype = m.sensor_objtype[idx]
 
@@ -559,7 +744,7 @@ def sensor_acc(m: Model, d: Data) -> Data:
         pos, bodyid = objtype_data[ot]
         pos = pos[objidt]
         bodyid = bodyid[objidt]
-        cacc = d.cacc[bodyid]
+        cacc = d._impl.cacc[bodyid]
 
         if sensor_type == SensorType.FRAMELINACC:
 
@@ -589,7 +774,7 @@ def sensor_acc(m: Model, d: Data) -> Data:
       # TODO(taylorhowell): raise error after adding sensor check to io.py
       continue  # unsupported sensor type
 
-    sensors.append(apply_cutoff(sensor, cutoff, data_type[0]).reshape(-1))
+    sensors.append(_apply_cutoff(sensor, cutoff, data_type[0]).reshape(-1))
     adrs.append(adr)
 
   if not adrs:

@@ -97,7 +97,7 @@ void mju_writeLog(const char* type, const char* msg) {
     // get time
     time(&rawtime);
 
-#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || defined(__STDC_VERSION_TIME_H__)
+#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || defined(__STDC_VERSION_TIME_H__) || defined(__EMSCRIPTEN__)
     localtime_r(&rawtime, &timeinfo);
 #elif _MSC_VER
     localtime_s(&timeinfo, &rawtime);
@@ -114,7 +114,6 @@ void mju_writeLog(const char* type, const char* msg) {
 }
 
 
-
 void mju_error_raw(const char* msg) {
   if (_mjPRIVATE_tls_error_fn) {
     _mjPRIVATE_tls_error_fn(msg);
@@ -123,14 +122,12 @@ void mju_error_raw(const char* msg) {
   } else {
     // write to log and console
     mju_writeLog("ERROR", msg);
-    printf("ERROR: %s\n\nPress Enter to exit ...", msg);
+    printf("ERROR: %s\n\n", msg);
 
-    // pause, exit
-    getchar();
+    // exit
     exit(EXIT_FAILURE);
   }
 }
-
 
 
 void mju_error_v(const char* msg, va_list args) {
@@ -141,7 +138,6 @@ void mju_error_v(const char* msg, va_list args) {
 }
 
 
-
 // write message to logfile and console, pause and exit
 void mju_error(const char* msg, ...) {
   va_list args;
@@ -149,7 +145,6 @@ void mju_error(const char* msg, ...) {
   mju_error_v(msg, args);
   va_end(args);
 }
-
 
 
 // write message to logfile and console
@@ -196,7 +191,6 @@ void mju_error_s(const char* msg, const char* text) {
 void mju_warning_s(const char* msg, const char* text) {
   mju_warning(msg, text);
 }
-
 
 
 //------------------------------ malloc and free ---------------------------------------------------

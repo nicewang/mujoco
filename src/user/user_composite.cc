@@ -12,25 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mujoco/mjspec.h>
 #include "user/user_composite.h"
 
-#include <algorithm>
 #include <cmath>
-#include <cstddef>
-#include <cstdio>
 #include <cstring>
-#include <map>
-#include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
-#include <mujoco/mjmacro.h>
 #include <mujoco/mjmodel.h>
+#include <mujoco/mjspec.h>
 #include <mujoco/mjtnum.h>
 #include "cc/array_safety.h"
-#include "engine/engine_io.h"
 #include "engine/engine_util_blas.h"
 #include "engine/engine_util_errmem.h"
 #include "engine/engine_util_misc.h"
@@ -40,9 +32,9 @@
 #include "user/user_util.h"
 
 namespace {
+
 namespace mju = ::mujoco::util;
-using mujoco::user::VectorToString;
-using mujoco::user::StringToVector;
+
 }  // namespace
 
 // strncpy with 0, return false
@@ -60,6 +52,8 @@ mjCComposite::mjCComposite(void) {
   type = mjCOMPTYPE_PARTICLE;
   count[0] = count[1] = count[2] = 1;
   mjuu_setvec(offset, 0, 0, 0);
+  mjuu_setvec(quat, 1, 0, 0, 0);
+  frame = nullptr;
 
   // plugin variables
   mjs_defaultPlugin(&plugin);
@@ -261,25 +255,26 @@ bool mjCComposite::MakeCable(mjCModel* model, mjsBody* body, char* error, int er
 
   // add name to model
   mjsText* pte = mjs_addText(&model->spec);
-  mjs_setString(pte->name, ("composite_" + prefix).c_str());
+  mjs_setName(pte->element, ("composite_" + prefix).c_str());
   mjs_setString(pte->data, ("rope_" + prefix).c_str());
 
   // populate uservert if not specified
   if (uservert.empty()) {
     for (int ix=0; ix < count[0]; ix++) {
+      double v[3];
       for (int k=0; k < 3; k++) {
         switch (curve[k]) {
           case mjCOMPSHAPE_LINE:
-            uservert.push_back(ix*size[0]/(count[0]-1));
+            v[k] = ix*size[0]/(count[0]-1);
             break;
           case mjCOMPSHAPE_COS:
-            uservert.push_back(size[1]*cos(mjPI*ix*size[2]/(count[0]-1)));
+            v[k] = size[1]*cos(mjPI*ix*size[2]/(count[0]-1));
             break;
           case mjCOMPSHAPE_SIN:
-            uservert.push_back(size[1]*sin(mjPI*ix*size[2]/(count[0]-1)));
+            v[k] = size[1]*sin(mjPI*ix*size[2]/(count[0]-1));
             break;
           case mjCOMPSHAPE_ZERO:
-            uservert.push_back(0);
+            v[k] = 0;
             break;
           default:
             // SHOULD NOT OCCUR
@@ -287,6 +282,8 @@ bool mjCComposite::MakeCable(mjCModel* model, mjsBody* body, char* error, int er
             break;
         }
       }
+      mjuu_rotVecQuat(v, v, quat);
+      uservert.insert(uservert.end(), v, v+3);
     }
   }
 
@@ -375,12 +372,15 @@ mjsBody* mjCComposite::AddCableBody(mjCModel* model, mjsBody* body, int ix,
 
   // add body
   body = mjs_addBody(body, 0);
-  mjs_setString(body->name, this_body);
+  mjs_setName(body->element, this_body);
   if (first) {
     mjuu_setvec(body->pos, offset[0]+uservert[3*ix],
                            offset[1]+uservert[3*ix+1],
                            offset[2]+uservert[3*ix+2]);
     mjuu_copyvec(body->quat, this_quat, 4);
+    if (frame) {
+      mjs_setFrame(body->element, frame);
+    }
   } else {
     mjuu_setvec(body->pos, length_prev, 0, 0);
     double negquat[4] = {prev_quat[0], -prev_quat[1], -prev_quat[2], -prev_quat[3]};
@@ -391,7 +391,7 @@ mjsBody* mjCComposite::AddCableBody(mjCModel* model, mjsBody* body, int ix,
   // add geom
   mjsGeom* geom = mjs_addGeom(body, &def[0].spec);
   mjs_setDefault(geom->element, mjs_getDefault(body->element));
-  mjs_setString(geom->name, txt_geom);
+  mjs_setName(geom->element, txt_geom);
   if (def[0].spec.geom->type == mjGEOM_CYLINDER ||
       def[0].spec.geom->type == mjGEOM_CAPSULE) {
     mjuu_zerovec(geom->fromto, 6);
@@ -422,7 +422,7 @@ mjsBody* mjCComposite::AddCableBody(mjCModel* model, mjsBody* body, int ix,
     jnt->damping = jnt->type == mjJNT_FREE ? 0 : jnt->damping;
     jnt->armature = jnt->type == mjJNT_FREE ? 0 : jnt->armature;
     jnt->frictionloss = jnt->type == mjJNT_FREE ? 0 : jnt->frictionloss;
-    mjs_setString(jnt->name, this_joint);
+    mjs_setName(jnt->element, this_joint);
   }
 
   // exclude contact pair
@@ -436,7 +436,7 @@ mjsBody* mjCComposite::AddCableBody(mjCModel* model, mjsBody* body, int ix,
   if (last || first) {
     mjsSite* site = mjs_addSite(body, &def[0].spec);
     mjs_setDefault(site->element, mjs_getDefault(body->element));
-    mjs_setString(site->name, txt_site);
+    mjs_setName(site->element, txt_site);
     mjuu_setvec(site->pos, last ? length : 0, 0, 0);
     mjuu_setvec(site->quat, 1, 0, 0, 0);
   }
@@ -480,7 +480,7 @@ void mjCComposite::MakeSkin2(mjCModel* model, mjtNum inflate) {
   // add skin, set name and material
   mjsSkin* skin = mjs_addSkin(&model->spec);
   mju::sprintf_arr(txt, "%sSkin", prefix.c_str());
-  mjs_setString(skin->name, txt);
+  mjs_setName(skin->element, txt);
   mjs_setString(skin->material, skinmaterial.c_str());
   mjuu_copyvec(skin->rgba, skinrgba, 4);
   skin->inflate = inflate;
@@ -967,7 +967,7 @@ void mjCComposite::MakeSkin2Subgrid(mjCModel* model, mjtNum inflate) {
   char txt[100];
   mjsSkin* skin = mjs_addSkin(&model->spec);
   mju::sprintf_arr(txt, "%sSkin", prefix.c_str());
-  mjs_setString(skin->name, txt);
+  mjs_setName(skin->element, txt);
   mjs_setString(skin->material, skinmaterial.c_str());
   mjuu_copyvec(skin->rgba, skinrgba, 4);
   skin->inflate = inflate;

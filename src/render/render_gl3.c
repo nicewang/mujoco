@@ -446,11 +446,16 @@ static void renderGeom(const mjvGeom* geom, int mode, const float* headpos,
     break;
 
   case mjGEOM_TRIANGLE:                       // triangle
+    glDisable(GL_CULL_FACE);
     glBegin(GL_TRIANGLES);
+    glNormal3f(0, 0, 1);
     glVertex3f(0, 0, 0);
     glVertex3f(size[0], 0, 0);
     glVertex3f(0, size[1], 0);
     glEnd();
+    if (scn->flags[mjRND_CULL_FACE]) {
+      glEnable(GL_CULL_FACE);
+    }
     break;
 
   case mjGEOM_FLEX:                           // flex
@@ -672,7 +677,7 @@ static void initLights(mjvScene* scn) {
     glLightfv(GL_LIGHT0+i, GL_SPECULAR, scn->lights[i].specular);
 
     // parameters for directional light
-    if (scn->lights[i].directional) {
+    if (scn->lights[i].type == mjLIGHT_DIRECTIONAL) {
       glLightf(GL_LIGHT0+i, GL_SPOT_EXPONENT,         0);
       glLightf(GL_LIGHT0+i, GL_SPOT_CUTOFF,           180);
       glLightf(GL_LIGHT0+i, GL_CONSTANT_ATTENUATION,  1);
@@ -681,12 +686,16 @@ static void initLights(mjvScene* scn) {
     }
 
     // parameters for spot light
-    else {
+    else if (scn->lights[i].type == mjLIGHT_SPOT) {
       glLightf(GL_LIGHT0+i, GL_SPOT_EXPONENT,         scn->lights[i].exponent);
       glLightf(GL_LIGHT0+i, GL_SPOT_CUTOFF,           scn->lights[i].cutoff);
       glLightf(GL_LIGHT0+i, GL_CONSTANT_ATTENUATION,  scn->lights[i].attenuation[0]);
       glLightf(GL_LIGHT0+i, GL_LINEAR_ATTENUATION,    scn->lights[i].attenuation[1]);
       glLightf(GL_LIGHT0+i, GL_QUADRATIC_ATTENUATION, scn->lights[i].attenuation[2]);
+    }
+
+    else {
+      // ignore unsupported light types: mjLIGHT_POINT, mjLIGHT_IMAGE
     }
   }
 
@@ -781,7 +790,7 @@ static inline int geomcmp(int* i, int* j, void* context) {
 }
 
 // define geomSort function for sorting geoms
-mjSORT(geomSort, int, geomcmp)
+mjSORT(geomSort, int, geomcmp);
 
 
 
@@ -790,14 +799,16 @@ static void adjustLight(const mjvLight* thislight, int n) {
   float temp[4];
 
   // set position and direction according to type
-  if (thislight->directional) {
+  if (thislight->type == mjLIGHT_DIRECTIONAL) {
     mjr_setf4(temp, -thislight->dir[0], -thislight->dir[1], -thislight->dir[2], 0);
     glLightfv(GL_LIGHT0+n, GL_POSITION, temp);
-  } else {
+  } else if (thislight->type == mjLIGHT_SPOT) {
     mjr_setf4(temp, thislight->dir[0], thislight->dir[1], thislight->dir[2], 0);
     glLightfv(GL_LIGHT0+n, GL_SPOT_DIRECTION, temp);
     mjr_setf4(temp, thislight->pos[0], thislight->pos[1], thislight->pos[2], 1);
     glLightfv(GL_LIGHT0+n, GL_POSITION, temp);
+  } else {
+    // ignore unsupported light types: mjLIGHT_POINT, mjLIGHT_IMAGE
   }
 }
 
@@ -1008,7 +1019,7 @@ void mjr_render(mjrRect viewport, mjvScene* scn, const mjrContext* con) {
     //---------------------------------- reflection rendering
 
     // plane and box reflection rendering
-    if (scn->flags[mjRND_REFLECTION]) {
+    if (scn->flags[mjRND_REFLECTION] && !scn->flags[mjRND_DEPTH]) {
       for (int i=0; i < ngeom; i++) {
         // get geom pointer
         thisgeom = scn->geoms + i;
@@ -1183,13 +1194,15 @@ void mjr_render(mjrRect viewport, mjvScene* scn, const mjrContext* con) {
             // reverse Z rendering mapping without shift [znear, zfar] -> [1, -1] (ndc)
             glScalef(1.0f, 1.0f, -1.0f);
           }
-          if (thislight->directional) {
+          if (thislight->type == mjLIGHT_DIRECTIONAL) {
             glOrtho(-con->shadowClip, con->shadowClip,
                     -con->shadowClip, con->shadowClip,
                     cam.frustum_near, cam.frustum_far);
-          } else {
+          } else if (thislight->type == mjLIGHT_SPOT) {
             mjr_perspective(mju_min(2*thislight->cutoff*con->shadowScale, 160), 1,
                             cam.frustum_near, cam.frustum_far);
+          } else {
+            // ignore unsupported light types: mjLIGHT_POINT, mjLIGHT_IMAGE
           }
           glGetFloatv(GL_PROJECTION_MATRIX, lightProject);
 
@@ -1211,9 +1224,24 @@ void mjr_render(mjrRect viewport, mjvScene* scn, const mjrContext* con) {
           int cull_face = glIsEnabled(GL_CULL_FACE);
           glDisable(GL_CULL_FACE);  // all faces cast shadows
           glEnable(GL_POLYGON_OFFSET_FILL);
-          float kOffsetFactor = -1.5f;
-          float kOffsetUnits = -4.0f;
-          glPolygonOffset(kOffsetFactor, kOffsetUnits);  // prevents "shadow acne"
+
+          // The limited resolution of the shadow maps means multiple fragments
+          // sample the same texel. When light and camera directions differ on
+          // surfaces that should be lit this causes "shadow acne"  because some
+          // fragments will be lit while adjacent fragments are not. To mitigate
+          // this artifact, an offset is applied to the depth values in the
+          // shadow map. The offset must be large enough to ensure consistent
+          // depth comparison occurs within the limited precision of the depth
+          // buffer. The offset is computed by glPolygonOffset using parameters
+          // that are chosen empirically. We need different values when clip
+          // control is on/off because this setting changes the depth precision.
+          float kOffsetFactor = -16.0f;
+          float kOffsetUnits = -512.0f;
+          if (mjGLAD_GL_ARB_clip_control) {
+            kOffsetFactor = -1.5f;
+            kOffsetUnits = -4.0f;
+          }
+          glPolygonOffset(kOffsetFactor, kOffsetUnits);
 
           // render all geoms to depth texture
           for (int j=0; j < ngeom; j++) {
@@ -1451,6 +1479,54 @@ void mjr_render(mjrRect viewport, mjvScene* scn, const mjrContext* con) {
 
     // disable scissor
     glDisable(GL_SCISSOR_TEST);
+  }
+
+  if (scn->flags[mjRND_DEPTH]) {
+    glPushAttrib(GL_ENABLE_BIT | GL_TRANSFORM_BIT | GL_TEXTURE_BIT |
+                 GL_LIGHTING_BIT | GL_POLYGON_BIT);
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, 1, 0, 1, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    void* depth_buf = mju_malloc(sizeof(float) * viewport.width * viewport.height);
+    glReadPixels(0, 0, viewport.width, viewport.height, GL_DEPTH_COMPONENT, GL_FLOAT, depth_buf);
+
+    GLuint depth_tex;
+    glEnable(GL_TEXTURE_2D);
+    glGenTextures(1, &depth_tex);
+    glBindTexture(GL_TEXTURE_2D, depth_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, viewport.width, viewport.height,
+                 0, GL_LUMINANCE, GL_FLOAT, depth_buf);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+    glColor4f(1, 1, 1, 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, 0); glVertex2f(0, 0);
+    glTexCoord2f(1, 0); glVertex2f(1, 0);
+    glTexCoord2f(1, 1); glVertex2f(1, 1);
+    glTexCoord2f(0, 1); glVertex2f(0, 1);
+    glEnd();
+
+    glDeleteTextures(1, &depth_tex);
+    mju_free(depth_buf);
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    glPopAttrib();
   }
 
   // restore currentBuffer

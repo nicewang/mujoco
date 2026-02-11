@@ -15,6 +15,7 @@
 #include "engine/engine_util_misc.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +51,6 @@ static mjtByte is_intersect(const mjtNum* p1, const mjtNum* p2,
 }
 
 
-
 // curve length along circle
 static mjtNum length_circle(const mjtNum* p0, const mjtNum* p1, int ind, mjtNum radius) {
   mjtNum p0n[2] = {p0[0], p0[1]};
@@ -69,7 +69,6 @@ static mjtNum length_circle(const mjtNum* p0, const mjtNum* p1, int ind, mjtNum 
 
   return radius*angle;
 }
-
 
 
 // 2D circle wrap
@@ -107,12 +106,12 @@ static mjtNum wrap_circle(mjtNum pnt[4], const mjtNum end[4], const mjtNum* side
     return -1;
   }
 
+  mjtNum sqrt0 = mju_sqrt(sqlen0 - sqrad);
+  mjtNum sqrt1 = mju_sqrt(sqlen1 - sqrad);
+
   // construct the two solutions, compute goodness
   mjtNum sol[2][2][2], good[2];
   for (int i=0; i < 2; i++) {
-    mjtNum sqrt0 = mju_sqrt(sqlen0 - sqrad);
-    mjtNum sqrt1 = mju_sqrt(sqlen1 - sqrad);
-
     int sgn = (i == 0 ? 1 : -1);
 
     sol[i][0][0] = (end[0]*sqrad + sgn*radius*end[1]*sqrt0)/sqlen0;
@@ -151,7 +150,6 @@ static mjtNum wrap_circle(mjtNum pnt[4], const mjtNum end[4], const mjtNum* side
   // return curve length
   return length_circle(sol[i][0], sol[i][1], i, radius);
 }
-
 
 
 // 2D inside wrap
@@ -271,7 +269,6 @@ static mjtNum wrap_inside(mjtNum pnt[4], const mjtNum end[4], mjtNum radius) {
 
   return 0;
 }
-
 
 
 // wrap tendons around spheres and cylinders
@@ -420,11 +417,11 @@ mjtNum mju_wrap(mjtNum wpnt[6], const mjtNum x0[3], const mjtNum x1[3],
 }
 
 
+//------------------------------ misc geometry -----------------------------------------------------
 
 // all 3 semi-axes of a geom
-void mju_geomSemiAxes(const mjModel* m, int geom_id, mjtNum semiaxes[3]) {
-  mjtNum* size = m->geom_size + 3*geom_id;
-  switch ((mjtGeom) m->geom_type[geom_id]) {
+void mju_geomSemiAxes(mjtNum semiaxes[3], const mjtNum size[3], mjtGeom type) {
+  switch (type) {
   case mjGEOM_SPHERE:
     semiaxes[0] = size[0];
     semiaxes[1] = size[0];
@@ -451,36 +448,144 @@ void mju_geomSemiAxes(const mjModel* m, int geom_id, mjtNum semiaxes[3]) {
 }
 
 
+// return 1 if point is inside a primitive geom, 0 otherwise
+int mju_insideGeom(const mjtNum pos[3], const mjtNum mat[9], const mjtNum size[3], mjtGeom type,
+                   const mjtNum point[3]) {
+  // vector from geom to point
+  mjtNum vec[3];
+  mju_sub3(vec, point, pos);
 
-// ----------------------------- Flex interpolation ------------------------------------------------
+  // quick return for spheres, frame rotation not required
+  if (type == mjGEOM_SPHERE) {
+    return mju_dot3(vec, vec) < size[0]*size[0];
+  }
 
-mjtNum static inline phi(mjtNum s, int i) {
-  if (i == 0) {
-    return 1-s;
-  } else {
-    return s;
+  // rotate into local frame
+  mjtNum plocal[3];
+  mju_mulMatTVec3(plocal, mat, vec);
+
+  // handle other geom types
+  switch (type) {
+  case mjGEOM_CAPSULE: {
+    mjtNum z = plocal[2];
+    mjtNum z_clamped = mju_clip(z, -size[1], size[1]);
+    mjtNum z_dist_sq = (z - z_clamped) * (z - z_clamped);
+    return (plocal[0]*plocal[0] + plocal[1]*plocal[1] + z_dist_sq < size[0]*size[0]);
+  }
+
+  case mjGEOM_ELLIPSOID:
+    return (plocal[0]*plocal[0]/(size[0]*size[0]) +
+            plocal[1]*plocal[1]/(size[1]*size[1]) +
+            plocal[2]*plocal[2]/(size[2]*size[2]) < 1);
+
+  case mjGEOM_CYLINDER:
+    return (mju_abs(plocal[2]) < size[1] &&
+            plocal[0]*plocal[0] + plocal[1]*plocal[1] < size[0]*size[0]);
+
+  case mjGEOM_BOX:
+    return (mju_abs(plocal[0]) < size[0] &&
+            mju_abs(plocal[1]) < size[1] &&
+            mju_abs(plocal[2]) < size[2]);
+
+  case mjGEOM_PLANE:
+    return plocal[2] < 0;
+
+  default:
+    return 0;
   }
 }
 
-mjtNum static inline dphi(mjtNum s, int i) {
-  if (i == 0) {
-    return -1;
+
+// compute ray origin and direction for pixel (col, row) in camera image
+// for perspective: origin is unchanged, direction is computed
+// for orthographic: direction is -Z in camera frame, origin is offset from camera center
+void mju_camPixelRay(mjtNum origin[3], mjtNum direction[3],
+                     const mjtNum cam_xpos[3], const mjtNum cam_xmat[9],
+                     int col, int row, mjtNum fx, mjtNum fy, mjtNum cx, mjtNum cy,
+                     int projection, mjtNum ortho_extent) {
+  // pixel center (row 0 = top of image)
+  mjtNum px = col + 0.5 - cx;
+  mjtNum py = row + 0.5 - cy;
+
+  if (projection == mjPROJ_PERSPECTIVE) {
+    // origin is camera position
+    mju_copy3(origin, cam_xpos);
+
+    // direction in camera frame: (x/fx, -y/fy, -1), then normalized
+    mjtNum dir_cam[3] = {px / fx, -py / fy, -1.0};
+    mju_mulMatVec3(direction, cam_xmat, dir_cam);
+    mju_normalize3(direction);
   } else {
-    return 1;
+    // orthographic: parallel rays, direction is -Z in camera frame
+    direction[0] = -cam_xmat[2];
+    direction[1] = -cam_xmat[5];
+    direction[2] = -cam_xmat[8];
+
+    // origin offset in camera frame (ortho_extent is full height, use half for each side)
+    mjtNum half_extent = ortho_extent / 2;
+    mjtNum offset_cam[3] = {px / fx * half_extent, -py / fy * half_extent, 0};
+    mjtNum offset_world[3];
+    mju_mulMatVec3(offset_world, cam_xmat, offset_cam);
+    mju_add3(origin, cam_xpos, offset_world);
+  }
+}
+
+
+// ----------------------------- flex interpolation ------------------------------------------------
+
+mjtNum static inline phi(mjtNum s, int i, int order) {
+  if (order == 1) {
+    return i == 0 ? 1 - s : s;
+  } else if (order == 2) {
+    switch (i) {
+      case 0:
+        return 2 * s * s - 3 * s + 1;
+      case 1:
+        return 4 * (s - s * s);
+      case 2:
+        return 2 * s * s - s;
+      default:
+        mjERROR("invalid index %d", i);
+        return 0;
+    }
+  } else {
+    mjERROR("order must be 1 or 2");
+    return 0;
+  }
+}
+
+mjtNum static inline dphi(mjtNum s, int i, int order) {
+  if (order == 1) {
+    return i == 0 ? -1 : 1;
+  } else if (order == 2) {
+    switch (i) {
+      case 0:
+        return 4 * s - 3;
+      case 1:
+        return 4 * (1 - 2 * s);
+      case 2:
+        return 4 * s - 1;
+      default:
+        mjERROR("invalid index %d, must be 0, 1, or 2", i);
+        return 0;
+    }
+  } else {
+    mjERROR("order must be 1 or 2");
+    return 0;
   }
 }
 
 // evaluate the deformation gradient at p using the nodal dof values
 void mju_defGradient(mjtNum res[9], const mjtNum p[3], const mjtNum* dof, int order) {
+  int idx = 0;
   mjtNum gradient[3];
   mju_zero(res, 9);
   for (int i = 0; i <= order; i++) {
     for (int j = 0; j <= order; j++) {
       for (int k = 0; k <= order; k++) {
-        int idx = 4*i + 2*j + k;
-        gradient[0] = dphi(p[0], i) *  phi(p[1], j) *  phi(p[2], k);
-        gradient[1] =  phi(p[0], i) * dphi(p[1], j) *  phi(p[2], k);
-        gradient[2] =  phi(p[0], i) *  phi(p[1], j) * dphi(p[2], k);
+        gradient[0] = dphi(p[0], i, order) *  phi(p[1], j, order) *  phi(p[2], k, order);
+        gradient[1] =  phi(p[0], i, order) * dphi(p[1], j, order) *  phi(p[2], k, order);
+        gradient[2] =  phi(p[0], i, order) *  phi(p[1], j, order) * dphi(p[2], k, order);
         res[0] += dof[3*idx+0] * gradient[0];
         res[1] += dof[3*idx+0] * gradient[1];
         res[2] += dof[3*idx+0] * gradient[2];
@@ -490,11 +595,30 @@ void mju_defGradient(mjtNum res[9], const mjtNum p[3], const mjtNum* dof, int or
         res[6] += dof[3*idx+2] * gradient[0];
         res[7] += dof[3*idx+2] * gradient[1];
         res[8] += dof[3*idx+2] * gradient[2];
+        idx++;
       }
     }
   }
 }
 
+// evaluate the basis function at x for the i-th node
+mjtNum mju_evalBasis(const mjtNum x[3], int i, int order) {
+  if (order == 1) {
+    return phi(x[2], i&1, order) * phi(x[1], i&2, order) * phi(x[0], i&4, order);
+  } else if (order == 2) {
+    return phi(x[2], i % 3, order) * phi(x[1], (i / 3) % 3, order) * phi(x[0], i / 9, order);
+  } else {
+    return -1;
+  }
+}
+
+// interpolate a function at x with given interpolation coefficients and order n
+void mju_interpolate3D(mjtNum res[3], const mjtNum x[3], const mjtNum* coeff, int order) {
+  int npoint = (order + 1) * (order + 1) * (order + 1);
+  for (int j=0; j < npoint; j++) {
+    mju_addToScl3(res, coeff+3*j, mju_evalBasis(x, j, order));
+  }
+}
 
 
 //------------------------------ actuator models ---------------------------------------------------
@@ -523,7 +647,6 @@ mjtNum mju_muscleGainLength(mjtNum length, mjtNum lmin, mjtNum lmax) {
 
   return 0.0;
 }
-
 
 
 // muscle active force, prm = (range[2], force, scale, lmin, lmax, vmax, fpmax, fvmax)
@@ -571,7 +694,6 @@ mjtNum mju_muscleGain(mjtNum len, mjtNum vel, const mjtNum lengthrange[2],
 }
 
 
-
 // muscle passive force, prm = (range[2], force, scale, lmin, lmax, vmax, fpmax, fvmax)
 mjtNum mju_muscleBias(mjtNum len, const mjtNum lengthrange[2],
                       mjtNum acc0, const mjtNum prm[9]) {
@@ -607,7 +729,6 @@ mjtNum mju_muscleBias(mjtNum len, const mjtNum lengthrange[2],
 }
 
 
-
 // muscle time constant with optional smoothing
 mjtNum mju_muscleDynamicsTimescale(mjtNum dctrl, mjtNum tau_act, mjtNum tau_deact,
                                    mjtNum smoothing_width) {
@@ -625,7 +746,6 @@ mjtNum mju_muscleDynamicsTimescale(mjtNum dctrl, mjtNum tau_act, mjtNum tau_deac
   }
   return tau;
 }
-
 
 
 // muscle activation dynamics, prm = (tau_act, tau_deact, smoothing_width)
@@ -647,7 +767,6 @@ mjtNum mju_muscleDynamics(mjtNum ctrl, mjtNum act, const mjtNum prm[3]) {
   // filter output
   return dctrl / mjMAX(mjMINVAL, tau);
 }
-
 
 
 //---------------------------------------- Base64 --------------------------------------------------
@@ -676,7 +795,6 @@ static uint32_t _decode(char ch) {
 
   return 0;
 }
-
 
 
 // encode data as Base64 into buf (including padding and null char)
@@ -732,7 +850,6 @@ size_t mju_encodeBase64(char* buf, const uint8_t* data, size_t ndata) {
 }
 
 
-
 // return size in decoded bytes if s is a valid Base64 encoding
 // return 0 if s is empty or invalid Base64 encoding
 size_t mju_isValidBase64(const char* s) {
@@ -761,7 +878,6 @@ size_t mju_isValidBase64(const char* s) {
   int len = i + pad;
   return len % 4 ? 0 : 3 * (len / 4) - pad;
 }
-
 
 
 // decode valid Base64 in string s into buf, undefined behavior if s is not valid Base64
@@ -794,6 +910,214 @@ size_t mju_decodeBase64(uint8_t* buf, const char* s) {
 }
 
 
+//------------------------------ history buffers ---------------------------------------------------
+
+// convert logical index (0=oldest, n-1=newest) to physical index
+// cursor points to the newest element (logical index n-1)
+static inline int historyPhysicalIndex(int cursor, int n, int logical) {
+  return (cursor + 1 + logical) % n;
+}
+
+
+// find logical index i such that times[i-1] < t <= times[i], using circular binary search
+// returns 0 if t <= times[oldest], n if t > times[newest]
+// cursor points to the newest element (logical index n-1)
+static int historyFindIndex(const mjtNum* times, int n, int cursor, mjtNum t) {
+  // get oldest and newest timestamps
+  int oldest_phys = historyPhysicalIndex(cursor, n, 0);
+  int newest_phys = historyPhysicalIndex(cursor, n, n-1);
+  mjtNum t_oldest = times[oldest_phys];
+  mjtNum t_newest = times[newest_phys];
+
+  // before or at first element
+  if (t <= t_oldest) {
+    return 0;
+  }
+
+  // after last element
+  if (t > t_newest) {
+    return n;
+  }
+
+  // circular binary search: find smallest logical i such that times[phys(i)] >= t
+  int lo = 0;
+  int hi = n - 1;
+  while (hi - lo > 1) {
+    int mid = (lo + hi) / 2;
+    int mid_phys = historyPhysicalIndex(cursor, n, mid);
+    if (times[mid_phys] < t) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+
+  return hi;
+}
+
+
+// initialize history buffer with given times and values; times must be strictly increasing
+// buffer layout: [user(1), cursor(1), times(n), values(n*dim)]
+void mju_historyInit(mjtNum* buf, int n, int dim, const mjtNum* times, const mjtNum* values,
+                     mjtNum user) {
+  // check strict monotonicity of times
+  for (int i = 0; i < n-1; i++) {
+    if (times[i+1] - times[i] < mjMINVAL) {
+      mjERROR("times must be strictly increasing, got times[%d]=%g >= times[%d]=%g",
+              i, times[i], i+1, times[i+1]);
+    }
+  }
+
+  // buf layout: [user(1), cursor(1), times(n), values(n*dim)]
+  buf[0] = user;           // user value
+  buf[1] = (mjtNum)(n-1);  // cursor points to newest (logical index n-1 = physical index n-1)
+
+  mjtNum* buf_times = buf + 2;
+  mjtNum* buf_values = buf + 2 + n;
+
+  if (times != buf_times) mju_copy(buf_times, times, n);
+  if (values) mju_copy(buf_values, values, n*dim);
+}
+
+
+// find insertion slot for time t, maintaining sorted order
+// if t matches an existing timestamp, returns pointer to that slot
+// if a new sample is inserted, the oldest sample is dropped
+// returns pointer to value slot where caller should write dim values
+mjtNum* mju_historyInsert(mjtNum* buf, int n, int dim, mjtNum t) {
+  int cursor = (int)buf[1];
+  mjtNum* times = buf + 2;
+  mjtNum* values = buf + 2 + n;
+
+  // find logical insertion index: times[i-1] < t <= times[i]
+  int i = historyFindIndex(times, n, cursor, t);
+
+  // exact match at logical i: return pointer to existing slot
+  if (i < n) {
+    int phys_i = historyPhysicalIndex(cursor, n, i);
+    if (mju_abs(t - times[phys_i]) < mjMINVAL) {
+      return values + phys_i*dim;
+    }
+  }
+
+  // logical i == 0: new sample is older than oldest, replace oldest slot
+  if (i == 0) {
+    int oldest_phys = historyPhysicalIndex(cursor, n, 0);
+    times[oldest_phys] = t;
+    return values + oldest_phys*dim;
+  }
+
+  // logical i == n: new sample is newer than newest, advance cursor and write
+  if (i == n) {
+    cursor = (cursor + 1) % n;
+    buf[1] = (mjtNum)cursor;
+
+    // cursor now points to the new newest slot (which was the old oldest)
+    times[cursor] = t;
+    return values + cursor*dim;
+  }
+
+  // 0 < i < n: out-of-order insertion, shift [1, i-1] left (dropping 0), insert at i-1
+  for (int j = 0; j < i-1; j++) {
+    int src_phys = historyPhysicalIndex(cursor, n, j+1);
+    int dst_phys = historyPhysicalIndex(cursor, n, j);
+    times[dst_phys] = times[src_phys];
+    mju_copy(values + dst_phys*dim, values + src_phys*dim, dim);
+  }
+  int insert_phys = historyPhysicalIndex(cursor, n, i-1);
+  times[insert_phys] = t;
+  return values + insert_phys*dim;
+}
+
+
+// read vector value at time t; interp: 0=zero-order-hold, 1=linear, 2=cubic spline
+// returns pointer to sample in buffer on exact match or ZOH (res untouched)
+// returns NULL and writes interpolated result to res on interpolation
+const mjtNum* mju_historyRead(const mjtNum* buf, int n, int dim, mjtNum* res, mjtNum t, int interp) {
+  int cursor = (int)buf[1];
+  const mjtNum* times = buf + 2;
+  const mjtNum* values = buf + 2 + n;
+
+  int oldest_phys = historyPhysicalIndex(cursor, n, 0);
+  int newest_phys = historyPhysicalIndex(cursor, n, n-1);
+  mjtNum t_oldest = times[oldest_phys];
+  mjtNum t_newest = times[newest_phys];
+
+  // extrapolate before oldest: return pointer to oldest value
+  if (t <= t_oldest + mjMINVAL) {
+    return values + oldest_phys*dim;
+  }
+
+  // extrapolate after newest: return pointer to newest value
+  if (t >= t_newest - mjMINVAL) {
+    return values + newest_phys*dim;
+  }
+
+  // find bracketing logical index: times[i-1] < t <= times[i]
+  int i = historyFindIndex(times, n, cursor, t);
+  int phys_i = historyPhysicalIndex(cursor, n, i);
+
+  // check for exact match at i
+  if (mju_abs(t - times[phys_i]) < mjMINVAL) {
+    return values + phys_i*dim;
+  }
+
+  // lo = i-1, hi = i (we know i > 0 because t > t_oldest)
+  int phys_lo = historyPhysicalIndex(cursor, n, i-1);
+  int phys_hi = phys_i;
+
+  // zero-order hold: return pointer to lo (most recent sample <= t)
+  if (interp == 0) {
+    return values + phys_lo*dim;
+  }
+
+  mjtNum dt = times[phys_hi] - times[phys_lo];
+  mjtNum alpha = (t - times[phys_lo]) / dt;
+
+  // piecewise linear interpolation
+  if (interp == 1) {
+    for (int d = 0; d < dim; d++) {
+      res[d] = values[phys_lo*dim+d] + alpha * (values[phys_hi*dim+d] - values[phys_lo*dim+d]);
+    }
+  }
+
+  // cubic spline interpolation
+  else {
+    // Hermite basis functions
+    mjtNum alpha2 = alpha * alpha;
+    mjtNum alpha3 = alpha2 * alpha;
+    mjtNum h00 = 2*alpha3 - 3*alpha2 + 1;
+    mjtNum h10 = alpha3 - 2*alpha2 + alpha;
+    mjtNum h01 = -2*alpha3 + 3*alpha2;
+    mjtNum h11 = alpha3 - alpha2;
+
+    for (int d = 0; d < dim; d++) {
+      // finite differenced catmull-rom slopes, 0 at endpoints (constant extrapolation)
+
+      mjtNum m_lo = 0;
+      if (i > 1) {
+        int phys_lo_prev = historyPhysicalIndex(cursor, n, i-2);
+        mjtNum dt_lo = times[phys_hi] - times[phys_lo_prev];
+        m_lo = (values[phys_hi*dim+d] - values[phys_lo_prev*dim+d]) / dt_lo;
+      }
+
+      mjtNum m_hi = 0;
+      if (i < n - 1) {
+        int phys_hi_next = historyPhysicalIndex(cursor, n, i+1);
+        mjtNum dt_hi = times[phys_hi_next] - times[phys_lo];
+        m_hi = (values[phys_hi_next*dim+d] - values[phys_lo*dim+d]) / dt_hi;
+      }
+
+      res[d] = h00 * values[phys_lo*dim+d] +
+               h10 * dt * m_lo +
+               h01 * values[phys_hi*dim+d] +
+               h11 * dt * m_hi;
+    }
+  }
+
+  return NULL;
+}
+
 
 //------------------------------ miscellaneous -----------------------------------------------------
 
@@ -812,7 +1136,6 @@ void mju_encodePyramid(mjtNum* pyramid, const mjtNum* force, const mjtNum* mu, i
     pyramid[2*i+1] = 0.5*(a-b);
   }
 }
-
 
 
 // convert pyramid representation to contact force
@@ -834,7 +1157,6 @@ void mju_decodePyramid(mjtNum* force, const mjtNum* pyramid, const mjtNum* mu, i
     force[i+1] = (pyramid[2*i] - pyramid[2*i+1]) * mu[i];
   }
 }
-
 
 
 // integrate spring-damper analytically, return pos(t)
@@ -889,7 +1211,6 @@ mjtNum mju_springDamper(mjtNum pos0, mjtNum vel0, mjtNum k, mjtNum b, mjtNum t) 
 }
 
 
-
 // return 1 if point is outside box given by pos, mat, size * inflate
 // return -1 if point is inside box given by pos, mat, size / inflate
 // return 0 if point is between the inflated and deflated boxes
@@ -935,7 +1256,6 @@ int mju_outsideBox(const mjtNum point[3], const mjtNum pos[3], const mjtNum mat[
 }
 
 
-
 // print matrix to screen
 void mju_printMat(const mjtNum* mat, int nr, int nc) {
   for (int r=0; r < nr; r++) {
@@ -946,7 +1266,6 @@ void mju_printMat(const mjtNum* mat, int nr, int nc) {
   }
   printf("\n");
 }
-
 
 
 // print sparse matrix to screen
@@ -963,7 +1282,6 @@ void mju_printMatSparse(const mjtNum* mat, int nr,
 }
 
 
-
 // min function, avoid re-evaluation
 mjtNum mju_min(mjtNum a, mjtNum b) {
   if (a <= b) {
@@ -974,7 +1292,6 @@ mjtNum mju_min(mjtNum a, mjtNum b) {
 }
 
 
-
 // max function, avoid re-evaluation
 mjtNum mju_max(mjtNum a, mjtNum b) {
   if (a >= b) {
@@ -983,7 +1300,6 @@ mjtNum mju_max(mjtNum a, mjtNum b) {
     return b;
   }
 }
-
 
 
 // clip x to the range [min, max]
@@ -998,7 +1314,6 @@ mjtNum mju_clip(mjtNum x, mjtNum min, mjtNum max) {
 }
 
 
-
 // sign function
 mjtNum mju_sign(mjtNum x) {
   if (x < 0) {
@@ -1009,7 +1324,6 @@ mjtNum mju_sign(mjtNum x) {
     return 0;
   }
 }
-
 
 
 // round to nearest integer
@@ -1023,7 +1337,6 @@ int mju_round(mjtNum x) {
     return (int)upper;
   }
 }
-
 
 
 // convert type id to type name
@@ -1111,7 +1424,6 @@ const char* mju_type2Str(int type) {
     return 0;
   }
 }
-
 
 
 // convert type id to type name
@@ -1222,7 +1534,6 @@ int mju_str2Type(const char* str) {
 }
 
 
-
 // return human readable number of bytes using standard letter suffix
 const char* mju_writeNumBytes(size_t nbytes) {
   int i;
@@ -1243,7 +1554,6 @@ const char* mju_writeNumBytes(size_t nbytes) {
 }
 
 
-
 // warning text
 const char* mju_warningText(int warning, size_t info) {
   static mjTHREADLOCAL char str[1000];
@@ -1255,8 +1565,7 @@ const char* mju_warningText(int warning, size_t info) {
 
   case mjWARN_CONTACTFULL:
     mjSNPRINTF(str,
-               "Too many contacts. Either the arena memory is full, or nconmax is specified and is "
-               "exceeded. Increase arena memory allocation, or increase/remove nconmax. "
+               "Too many contacts. The arena memory is full, increase arena memory allocation."
                "(ncon = %zu)", info);
     break;
 
@@ -1295,16 +1604,14 @@ const char* mju_warningText(int warning, size_t info) {
 }
 
 
-
 // return 1 if nan or abs(x)>mjMAXVAL, 0 otherwise
 int mju_isBad(mjtNum x) {
   return (x != x || x > mjMAXVAL || x < -mjMAXVAL);
 }
 
 
-
 // return 1 if all elements are 0
-int mju_isZero(mjtNum* vec, int n) {
+int mju_isZero(const mjtNum* vec, int n) {
   for (int i=0; i < n; i++) {
     if (vec[i] != 0) {
       return 0;
@@ -1315,15 +1622,16 @@ int mju_isZero(mjtNum* vec, int n) {
 }
 
 
+// return 1 if all elements are 0
+int mju_isZeroByte(const unsigned char* vec, int n) {
+  if (!n || *vec) return !n;
+  return memcmp(vec, vec + 1, n - 1) == 0;
+}
+
 
 // set integer vector to 0
 void mju_zeroInt(int* res, int n) {
   memset(res, 0, n*sizeof(int));
-}
-
-
-void mju_zeroSizeT(size_t* res, size_t n) {
-  memset(res, 0, n*sizeof(size_t));
 }
 
 
@@ -1332,7 +1640,12 @@ void mju_copyInt(int* res, const int* vec, int n) {
   memcpy(res, vec, n*sizeof(int));
 }
 
-
+// fill int vector with val
+void mju_fillInt(int* res, int val, int n) {
+  for (int i = 0; i < n; i++) {
+    res[i] = val;
+  }
+}
 
 // standard normal random number generator (optional second number)
 mjtNum mju_standardNormal(mjtNum* num2) {
@@ -1354,14 +1667,12 @@ mjtNum mju_standardNormal(mjtNum* num2) {
 }
 
 
-
 // convert from float to mjtNum
 void mju_f2n(mjtNum* res, const float* vec, int n) {
   for (int i=0; i < n; i++) {
     res[i] = (mjtNum) vec[i];
   }
 }
-
 
 
 // convert from mjtNum to float
@@ -1380,7 +1691,6 @@ void mju_d2n(mjtNum* res, const double* vec, int n) {
 }
 
 
-
 // convert from mjtNum to double
 void mju_n2d(double* res, const mjtNum* vec, int n) {
   for (int i=0; i < n; i++) {
@@ -1388,6 +1698,133 @@ void mju_n2d(double* res, const mjtNum* vec, int n) {
   }
 }
 
+
+// gather
+void mju_gather(mjtNum* restrict res, const mjtNum* restrict vec, const int* restrict ind, int n) {
+  for (int i=0; i < n; i++) {
+    res[i] = vec[ind[i]];
+  }
+}
+
+
+// masked gather (set to 0 at negative indices)
+void mju_gatherMasked(mjtNum* restrict res, const mjtNum* restrict vec,
+                      const int* restrict ind, int n) {
+  for (int i=0; i < n; i++) {
+    res[i] = ind[i] >= 0 ? vec[ind[i]] : 0;
+  }
+}
+
+
+// scatter
+void mju_scatter(mjtNum* restrict res, const mjtNum* restrict vec, const int* restrict ind, int n) {
+  for (int i=0; i < n; i++) {
+    res[ind[i]] = vec[i];
+  }
+}
+
+
+// gather integers
+void mju_gatherInt(int* restrict res, const int* restrict vec, const int* restrict ind, int n) {
+  for (int i=0; i < n; i++) {
+    res[i] = vec[ind[i]];
+  }
+}
+
+
+// scatter integers
+void mju_scatterInt(int* restrict res, const int* restrict vec, const int* restrict ind, int n) {
+  for (int i=0; i < n; i++) {
+    res[ind[i]] = vec[i];
+  }
+}
+
+
+// build gather indices mapping src to res, assumes pattern(res) \subseteq pattern(src)
+void mju_sparseMap(int* map, int nr,
+                   const int* res_rowadr, const int* res_rownnz, const int* res_colind,
+                   const int* src_rowadr, const int* src_rownnz, const int* src_colind) {
+  for (int i = 0; i < nr; i++) {
+    int res_cursor = res_rowadr[i];
+    int res_end    = res_cursor + res_rownnz[i];
+    int src_cursor = src_rowadr[i];
+    int src_end    = src_cursor + src_rownnz[i];
+
+    while (res_cursor < res_end) {
+      int res_col = res_colind[res_cursor];
+      while (src_cursor < src_end && src_colind[src_cursor] < res_col) {
+        src_cursor++;
+      }
+
+      // found match, set index and advance cursors
+      map[res_cursor++] = src_cursor++;
+    }
+  }
+}
+
+
+// build masked-gather map to copy a lower-triangular src into symmetric res
+//  `cursor` is a preallocated buffer of size `nr`
+void mju_lower2SymMap(int* map, int nr,
+                      const int* res_rowadr, const int* res_rownnz, const int* res_colind,
+                      const int* src_rowadr, const int* src_rownnz, const int* src_colind,
+                      int* cursor) {
+  if (!nr) return;
+
+  // default all map entries to "no source"
+  int nnz = res_rowadr[nr-1] + res_rownnz[nr-1];
+  mju_fillInt(map, -1, nnz);
+
+  // initialize per-row cursor
+  for (int i = 0; i < nr; i++) {
+    cursor[i] = res_rowadr[i];
+  }
+
+  // sweep src rows; for each lower (i,j) set res(i,j) and res(j,i)
+  for (int i = 0; i < nr; i++) {
+    int src_start = src_rowadr[i];
+    int src_end   = src_start + src_rownnz[i];
+
+    // sweep src row
+    for (int k = src_start; k < src_end; k++) {
+      int j = src_colind[k];
+      if (j > i) break;  // use only lower triangle of src
+
+      // --- lower triangle: res(i, j)
+      int res_start = res_rowadr[i];
+      int res_end   = res_start + res_rownnz[i];
+      int c         = cursor[i];
+
+      // increment c until there is a match
+      while (c < res_end && res_colind[c] < j) c++;
+
+      // found match, set index, advance and save cursor
+      if (c < res_end && res_colind[c] == j) {
+        map[c] = k;
+        c++;
+      }
+      cursor[i] = c;
+
+
+      // --- upper mirror: res(j, i)
+      if (j != i) {
+        res_start = res_rowadr[j];
+        res_end   = res_start + res_rownnz[j];
+        c         = cursor[j];
+
+        // increment c until there is a match
+        while (c < res_end && res_colind[c] < i) c++;
+
+        // found match, set index and advance and save cursor
+        if (c < res_end && res_colind[c] == i) {
+          map[c] = k;
+          c++;
+        }
+        cursor[j] = c;
+      }
+    }
+  }
+}
 
 
 // insertion sort, increasing order
@@ -1404,7 +1841,6 @@ void mju_insertionSort(mjtNum* list, int n) {
 }
 
 
-
 // integer insertion sort, increasing order
 void mju_insertionSortInt(int* list, int n) {
   for (int i=1; i < n; i++) {
@@ -1417,7 +1853,6 @@ void mju_insertionSortInt(int* list, int n) {
     list[j+1] = x;
   }
 }
-
 
 
 // Halton sequence
@@ -1438,7 +1873,6 @@ mjtNum mju_Halton(int index, int base) {
 }
 
 
-
 // Call strncpy, then set dst[n-1] = 0.
 char* mju_strncpy(char *dst, const char *src, int n) {
   if (dst && src && n > 0) {
@@ -1448,7 +1882,6 @@ char* mju_strncpy(char *dst, const char *src, int n) {
 
   return dst;
 }
-
 
 
 // sigmoid function over 0<=x<=1 using quintic polynomial

@@ -85,6 +85,20 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              ),
          ),
      )),
+    ('mjCache',
+     StructDecl(
+         name='mjCache',
+         declname='struct mjCache_',
+         fields=(
+             StructFieldDecl(
+                 name='impl_',
+                 type=PointerType(
+                     inner_type=ValueType(name='void'),
+                 ),
+                 doc='internal pointer to cache',
+             ),
+         ),
+     )),
     ('mjVFS',
      StructDecl(
          name='mjVFS',
@@ -110,11 +124,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='timestep',
              ),
              StructFieldDecl(
-                 name='apirate',
-                 type=ValueType(name='mjtNum'),
-                 doc='update rate for remote API (Hz)',
-             ),
-             StructFieldDecl(
                  name='impratio',
                  type=ValueType(name='mjtNum'),
                  doc='ratio of friction-to-normal contact impedance',
@@ -138,6 +147,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='ccd_tolerance',
                  type=ValueType(name='mjtNum'),
                  doc='convex collision solver tolerance',
+             ),
+             StructFieldDecl(
+                 name='sleep_tolerance',
+                 type=ValueType(name='mjtNum'),
+                 doc='sleep velocity tolerance',
              ),
              StructFieldDecl(
                  name='gravity',
@@ -278,6 +292,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='global',
                  type=AnonymousStructDecl(
                      fields=(
+                         StructFieldDecl(
+                             name='cameraid',
+                             type=ValueType(name='int'),
+                             doc='initial camera id (-1: free)',
+                         ),
                          StructFieldDecl(
                              name='orthographic',
                              type=ValueType(name='int'),
@@ -830,427 +849,447 @@ STRUCTS: Mapping[str, StructDecl] = dict([
          fields=(
              StructFieldDecl(
                  name='nq',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of generalized coordinates = dim(qpos)',
              ),
              StructFieldDecl(
                  name='nv',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of degrees of freedom = dim(qvel)',
              ),
              StructFieldDecl(
                  name='nu',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of actuators/controls = dim(ctrl)',
              ),
              StructFieldDecl(
                  name='na',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of activation states = dim(act)',
              ),
              StructFieldDecl(
                  name='nbody',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of bodies',
              ),
              StructFieldDecl(
                  name='nbvh',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of total bounding volumes in all bodies',
              ),
              StructFieldDecl(
                  name='nbvhstatic',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of static bounding volumes (aabb stored in mjModel)',  # pylint: disable=line-too-long
              ),
              StructFieldDecl(
                  name='nbvhdynamic',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of dynamic bounding volumes (aabb stored in mjData)',  # pylint: disable=line-too-long
              ),
              StructFieldDecl(
+                 name='noct',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of total octree cells in all meshes',
+             ),
+             StructFieldDecl(
                  name='njnt',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of joints',
              ),
              StructFieldDecl(
-                 name='ngeom',
-                 type=ValueType(name='int'),
-                 doc='number of geoms',
-             ),
-             StructFieldDecl(
-                 name='nsite',
-                 type=ValueType(name='int'),
-                 doc='number of sites',
-             ),
-             StructFieldDecl(
-                 name='ncam',
-                 type=ValueType(name='int'),
-                 doc='number of cameras',
-             ),
-             StructFieldDecl(
-                 name='nlight',
-                 type=ValueType(name='int'),
-                 doc='number of lights',
-             ),
-             StructFieldDecl(
-                 name='nflex',
-                 type=ValueType(name='int'),
-                 doc='number of flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexnode',
-                 type=ValueType(name='int'),
-                 doc='number of dofs in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexvert',
-                 type=ValueType(name='int'),
-                 doc='number of vertices in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexedge',
-                 type=ValueType(name='int'),
-                 doc='number of edges in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexelem',
-                 type=ValueType(name='int'),
-                 doc='number of elements in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexelemdata',
-                 type=ValueType(name='int'),
-                 doc='number of element vertex ids in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexelemedge',
-                 type=ValueType(name='int'),
-                 doc='number of element edge ids in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexshelldata',
-                 type=ValueType(name='int'),
-                 doc='number of shell fragment vertex ids in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflexevpair',
-                 type=ValueType(name='int'),
-                 doc='number of element-vertex pairs in all flexes',
-             ),
-             StructFieldDecl(
-                 name='nflextexcoord',
-                 type=ValueType(name='int'),
-                 doc='number of vertices with texture coordinates',
-             ),
-             StructFieldDecl(
-                 name='nmesh',
-                 type=ValueType(name='int'),
-                 doc='number of meshes',
-             ),
-             StructFieldDecl(
-                 name='nmeshvert',
-                 type=ValueType(name='int'),
-                 doc='number of vertices in all meshes',
-             ),
-             StructFieldDecl(
-                 name='nmeshnormal',
-                 type=ValueType(name='int'),
-                 doc='number of normals in all meshes',
-             ),
-             StructFieldDecl(
-                 name='nmeshtexcoord',
-                 type=ValueType(name='int'),
-                 doc='number of texcoords in all meshes',
-             ),
-             StructFieldDecl(
-                 name='nmeshface',
-                 type=ValueType(name='int'),
-                 doc='number of triangular faces in all meshes',
-             ),
-             StructFieldDecl(
-                 name='nmeshgraph',
-                 type=ValueType(name='int'),
-                 doc='number of ints in mesh auxiliary data',
-             ),
-             StructFieldDecl(
-                 name='nmeshpoly',
-                 type=ValueType(name='int'),
-                 doc='number of polygons in all meshes',
-             ),
-             StructFieldDecl(
-                 name='nmeshpolyvert',
-                 type=ValueType(name='int'),
-                 doc='number of vertices in all polygons',
-             ),
-             StructFieldDecl(
-                 name='nmeshpolymap',
-                 type=ValueType(name='int'),
-                 doc='number of polygons in vertex map',
-             ),
-             StructFieldDecl(
-                 name='nskin',
-                 type=ValueType(name='int'),
-                 doc='number of skins',
-             ),
-             StructFieldDecl(
-                 name='nskinvert',
-                 type=ValueType(name='int'),
-                 doc='number of vertices in all skins',
-             ),
-             StructFieldDecl(
-                 name='nskintexvert',
-                 type=ValueType(name='int'),
-                 doc='number of vertiex with texcoords in all skins',
-             ),
-             StructFieldDecl(
-                 name='nskinface',
-                 type=ValueType(name='int'),
-                 doc='number of triangular faces in all skins',
-             ),
-             StructFieldDecl(
-                 name='nskinbone',
-                 type=ValueType(name='int'),
-                 doc='number of bones in all skins',
-             ),
-             StructFieldDecl(
-                 name='nskinbonevert',
-                 type=ValueType(name='int'),
-                 doc='number of vertices in all skin bones',
-             ),
-             StructFieldDecl(
-                 name='nhfield',
-                 type=ValueType(name='int'),
-                 doc='number of heightfields',
-             ),
-             StructFieldDecl(
-                 name='nhfielddata',
-                 type=ValueType(name='int'),
-                 doc='number of data points in all heightfields',
-             ),
-             StructFieldDecl(
-                 name='ntex',
-                 type=ValueType(name='int'),
-                 doc='number of textures',
-             ),
-             StructFieldDecl(
-                 name='ntexdata',
-                 type=ValueType(name='int'),
-                 doc='number of bytes in texture rgb data',
-             ),
-             StructFieldDecl(
-                 name='nmat',
-                 type=ValueType(name='int'),
-                 doc='number of materials',
-             ),
-             StructFieldDecl(
-                 name='npair',
-                 type=ValueType(name='int'),
-                 doc='number of predefined geom pairs',
-             ),
-             StructFieldDecl(
-                 name='nexclude',
-                 type=ValueType(name='int'),
-                 doc='number of excluded geom pairs',
-             ),
-             StructFieldDecl(
-                 name='neq',
-                 type=ValueType(name='int'),
-                 doc='number of equality constraints',
-             ),
-             StructFieldDecl(
-                 name='ntendon',
-                 type=ValueType(name='int'),
-                 doc='number of tendons',
-             ),
-             StructFieldDecl(
-                 name='nwrap',
-                 type=ValueType(name='int'),
-                 doc='number of wrap objects in all tendon paths',
-             ),
-             StructFieldDecl(
-                 name='nsensor',
-                 type=ValueType(name='int'),
-                 doc='number of sensors',
-             ),
-             StructFieldDecl(
-                 name='nnumeric',
-                 type=ValueType(name='int'),
-                 doc='number of numeric custom fields',
-             ),
-             StructFieldDecl(
-                 name='nnumericdata',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in all numeric fields',
-             ),
-             StructFieldDecl(
-                 name='ntext',
-                 type=ValueType(name='int'),
-                 doc='number of text custom fields',
-             ),
-             StructFieldDecl(
-                 name='ntextdata',
-                 type=ValueType(name='int'),
-                 doc='number of mjtBytes in all text fields',
-             ),
-             StructFieldDecl(
-                 name='ntuple',
-                 type=ValueType(name='int'),
-                 doc='number of tuple custom fields',
-             ),
-             StructFieldDecl(
-                 name='ntupledata',
-                 type=ValueType(name='int'),
-                 doc='number of objects in all tuple fields',
-             ),
-             StructFieldDecl(
-                 name='nkey',
-                 type=ValueType(name='int'),
-                 doc='number of keyframes',
-             ),
-             StructFieldDecl(
-                 name='nmocap',
-                 type=ValueType(name='int'),
-                 doc='number of mocap bodies',
-             ),
-             StructFieldDecl(
-                 name='nplugin',
-                 type=ValueType(name='int'),
-                 doc='number of plugin instances',
-             ),
-             StructFieldDecl(
-                 name='npluginattr',
-                 type=ValueType(name='int'),
-                 doc='number of chars in all plugin config attributes',
-             ),
-             StructFieldDecl(
-                 name='nuser_body',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in body_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_jnt',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in jnt_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_geom',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in geom_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_site',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in site_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_cam',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in cam_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_tendon',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in tendon_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_actuator',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in actuator_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_sensor',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in sensor_user',
-             ),
-             StructFieldDecl(
-                 name='nnames',
-                 type=ValueType(name='int'),
-                 doc='number of chars in all names',
-             ),
-             StructFieldDecl(
-                 name='npaths',
-                 type=ValueType(name='int'),
-                 doc='number of chars in all paths',
-             ),
-             StructFieldDecl(
-                 name='nnames_map',
-                 type=ValueType(name='int'),
-                 doc='number of slots in the names hash map',
+                 name='ntree',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of kinematic trees under world body',
              ),
              StructFieldDecl(
                  name='nM',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of non-zeros in sparse inertia matrix',
              ),
              StructFieldDecl(
                  name='nB',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of non-zeros in sparse body-dof matrix',
              ),
              StructFieldDecl(
                  name='nC',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of non-zeros in sparse reduced dof-dof matrix',
              ),
              StructFieldDecl(
                  name='nD',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of non-zeros in sparse dof-dof matrix',
              ),
              StructFieldDecl(
+                 name='ngeom',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of geoms',
+             ),
+             StructFieldDecl(
+                 name='nsite',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of sites',
+             ),
+             StructFieldDecl(
+                 name='ncam',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of cameras',
+             ),
+             StructFieldDecl(
+                 name='nlight',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of lights',
+             ),
+             StructFieldDecl(
+                 name='nflex',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexnode',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of dofs in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexvert',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexedge',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of edges in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexelem',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of elements in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexelemdata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of element vertex ids in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexelemedge',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of element edge ids in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexshelldata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of shell fragment vertex ids in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflexevpair',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of element-vertex pairs in all flexes',
+             ),
+             StructFieldDecl(
+                 name='nflextexcoord',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices with texture coordinates',
+             ),
+             StructFieldDecl(
+                 name='nJfe',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of non-zeros in sparse flexedge Jacobian matrix',
+             ),
+             StructFieldDecl(
+                 name='nJfv',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of non-zeros in sparse flexvert Jacobian matrix',
+             ),
+             StructFieldDecl(
+                 name='nmesh',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of meshes',
+             ),
+             StructFieldDecl(
+                 name='nmeshvert',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices in all meshes',
+             ),
+             StructFieldDecl(
+                 name='nmeshnormal',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of normals in all meshes',
+             ),
+             StructFieldDecl(
+                 name='nmeshtexcoord',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of texcoords in all meshes',
+             ),
+             StructFieldDecl(
+                 name='nmeshface',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of triangular faces in all meshes',
+             ),
+             StructFieldDecl(
+                 name='nmeshgraph',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of ints in mesh auxiliary data',
+             ),
+             StructFieldDecl(
+                 name='nmeshpoly',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of polygons in all meshes',
+             ),
+             StructFieldDecl(
+                 name='nmeshpolyvert',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices in all polygons',
+             ),
+             StructFieldDecl(
+                 name='nmeshpolymap',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of polygons in vertex map',
+             ),
+             StructFieldDecl(
+                 name='nskin',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of skins',
+             ),
+             StructFieldDecl(
+                 name='nskinvert',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices in all skins',
+             ),
+             StructFieldDecl(
+                 name='nskintexvert',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices with texcoords in all skins',
+             ),
+             StructFieldDecl(
+                 name='nskinface',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of triangular faces in all skins',
+             ),
+             StructFieldDecl(
+                 name='nskinbone',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of bones in all skins',
+             ),
+             StructFieldDecl(
+                 name='nskinbonevert',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of vertices in all skin bones',
+             ),
+             StructFieldDecl(
+                 name='nhfield',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of heightfields',
+             ),
+             StructFieldDecl(
+                 name='nhfielddata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of data points in all heightfields',
+             ),
+             StructFieldDecl(
+                 name='ntex',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of textures',
+             ),
+             StructFieldDecl(
+                 name='ntexdata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of bytes in texture rgb data',
+             ),
+             StructFieldDecl(
+                 name='nmat',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of materials',
+             ),
+             StructFieldDecl(
+                 name='npair',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of predefined geom pairs',
+             ),
+             StructFieldDecl(
+                 name='nexclude',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of excluded geom pairs',
+             ),
+             StructFieldDecl(
+                 name='neq',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of equality constraints',
+             ),
+             StructFieldDecl(
+                 name='ntendon',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of tendons',
+             ),
+             StructFieldDecl(
+                 name='nwrap',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of wrap objects in all tendon paths',
+             ),
+             StructFieldDecl(
+                 name='nsensor',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of sensors',
+             ),
+             StructFieldDecl(
+                 name='nnumeric',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of numeric custom fields',
+             ),
+             StructFieldDecl(
+                 name='nnumericdata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in all numeric fields',
+             ),
+             StructFieldDecl(
+                 name='ntext',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of text custom fields',
+             ),
+             StructFieldDecl(
+                 name='ntextdata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtBytes in all text fields',
+             ),
+             StructFieldDecl(
+                 name='ntuple',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of tuple custom fields',
+             ),
+             StructFieldDecl(
+                 name='ntupledata',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of objects in all tuple fields',
+             ),
+             StructFieldDecl(
+                 name='nkey',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of keyframes',
+             ),
+             StructFieldDecl(
+                 name='nmocap',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mocap bodies',
+             ),
+             StructFieldDecl(
+                 name='nplugin',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of plugin instances',
+             ),
+             StructFieldDecl(
+                 name='npluginattr',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of chars in all plugin config attributes',
+             ),
+             StructFieldDecl(
+                 name='nuser_body',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in body_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_jnt',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in jnt_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_geom',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in geom_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_site',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in site_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_cam',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in cam_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_tendon',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in tendon_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_actuator',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in actuator_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_sensor',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in sensor_user',
+             ),
+             StructFieldDecl(
+                 name='nnames',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of chars in all names',
+             ),
+             StructFieldDecl(
+                 name='npaths',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of chars in all paths',
+             ),
+             StructFieldDecl(
+                 name='nnames_map',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of slots in the names hash map',
+             ),
+             StructFieldDecl(
                  name='nJmom',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of non-zeros in sparse actuator_moment matrix',
              ),
              StructFieldDecl(
-                 name='ntree',
-                 type=ValueType(name='int'),
-                 doc='number of kinematic trees under world body',
-             ),
-             StructFieldDecl(
                  name='ngravcomp',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of bodies with nonzero gravcomp',
              ),
              StructFieldDecl(
                  name='nemax',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of potential equality-constraint rows',
              ),
              StructFieldDecl(
                  name='njmax',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of available rows in constraint Jacobian (legacy)',
              ),
              StructFieldDecl(
                  name='nconmax',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of potential contacts in contact list (legacy)',
              ),
              StructFieldDecl(
                  name='nuserdata',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of mjtNums reserved for the user',
              ),
              StructFieldDecl(
                  name='nsensordata',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of mjtNums in sensor data vector',
              ),
              StructFieldDecl(
                  name='npluginstate',
-                 type=ValueType(name='int'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of mjtNums in plugin state vector',
              ),
              StructFieldDecl(
+                 name='nhistory',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of mjtNums in history buffer',
+             ),
+             StructFieldDecl(
                  name='narena',
-                 type=ValueType(name='size_t'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of bytes in the mjData arena (inclusive of stack)',
              ),
              StructFieldDecl(
                  name='nbuffer',
-                 type=ValueType(name='size_t'),
+                 type=ValueType(name='mjtSize'),
                  doc='number of bytes in buffer',
              ),
              StructFieldDecl(
@@ -1304,7 +1343,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='id of root above body',
+                 doc='ancestor that is direct child of world',
                  array_extent=('nbody',),
              ),
              StructFieldDecl(
@@ -1312,7 +1351,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='id of body that this body is welded to',
+                 doc='top ancestor with no dofs to this body',
                  array_extent=('nbody',),
              ),
              StructFieldDecl(
@@ -1556,6 +1595,38 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nbvhstatic', 6),
              ),
              StructFieldDecl(
+                 name='oct_depth',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='depth in the octree',
+                 array_extent=('noct',),
+             ),
+             StructFieldDecl(
+                 name='oct_child',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='children of octree node',
+                 array_extent=('noct', 8),
+             ),
+             StructFieldDecl(
+                 name='oct_aabb',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='octree node bounding box (center, size)',
+                 array_extent=('noct', 6),
+             ),
+             StructFieldDecl(
+                 name='oct_coeff',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='octree interpolation coefficients',
+                 array_extent=('noct', 8),
+             ),
+             StructFieldDecl(
                  name='jnt_type',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
@@ -1744,14 +1815,16 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='constraint solver reference:frictionloss (nv x mjNREF)',
+                 doc='constraint solver reference:frictionloss',
+                 array_extent=('nv', 'mjNREF'),
              ),
              StructFieldDecl(
                  name='dof_solimp',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='constraint solver impedance:frictionloss (nv x mjNIMP)',
+                 doc='constraint solver impedance:frictionloss',
+                 array_extent=('nv', 'mjNIMP'),
              ),
              StructFieldDecl(
                  name='dof_frictionloss',
@@ -1792,6 +1865,54 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='diag. inertia in qpos0',
                  array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='dof_length',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='linear: 1; angular: approx. length scale',
+                 array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='tree_bodyadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='start addr of bodies',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
+                 name='tree_bodynum',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of bodies in tree',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
+                 name='tree_dofadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='start addr of dofs',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
+                 name='tree_dofnum',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of dofs in tree',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
+                 name='tree_sleep_policy',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='sleep policy (mjtSleepPolicy)',
+                 array_extent=('ntree',),
              ),
              StructFieldDecl(
                  name='geom_type',
@@ -1958,7 +2079,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='detect contact if dist<margin(ngeom x 1)',
+                 doc='detect contact if dist<margin',
+                 array_extent=('ngeom',),
              ),
              StructFieldDecl(
                  name='geom_gap',
@@ -2117,7 +2239,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='global position rel. to sub-com in qpos0 (ncam x 3)',
+                 doc='global position rel. to sub-com in qpos0',
+                 array_extent=('ncam', 3),
              ),
              StructFieldDecl(
                  name='cam_pos0',
@@ -2136,11 +2259,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('ncam', 9),
              ),
              StructFieldDecl(
-                 name='cam_orthographic',
+                 name='cam_projection',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='orthographic camera; 0: no, 1: yes',
+                 doc='projection type (mjtProjection)',
                  array_extent=('ncam',),
              ),
              StructFieldDecl(
@@ -2166,6 +2289,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='resolution: pixels [width, height]',
                  array_extent=('ncam', 2),
+             ),
+             StructFieldDecl(
+                 name='cam_output',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='output types (mjtCamOut bit flags)',
+                 array_extent=('ncam',),
              ),
              StructFieldDecl(
                  name='cam_sensorsize',
@@ -2216,11 +2347,19 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nlight',),
              ),
              StructFieldDecl(
-                 name='light_directional',
+                 name='light_type',
                  type=PointerType(
-                     inner_type=ValueType(name='mjtByte'),
+                     inner_type=ValueType(name='int'),
                  ),
-                 doc='directional light',
+                 doc='spot, directional, etc. (mjtLightType)',
+                 array_extent=('nlight',),
+             ),
+             StructFieldDecl(
+                 name='light_texid',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='texture id for image lights',
                  array_extent=('nlight',),
              ),
              StructFieldDecl(
@@ -2237,6 +2376,22 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='float'),
                  ),
                  doc='light radius for soft shadows',
+                 array_extent=('nlight',),
+             ),
+             StructFieldDecl(
+                 name='light_intensity',
+                 type=PointerType(
+                     inner_type=ValueType(name='float'),
+                 ),
+                 doc='intensity, in candela',
+                 array_extent=('nlight',),
+             ),
+             StructFieldDecl(
+                 name='light_range',
+                 type=PointerType(
+                     inner_type=ValueType(name='float'),
+                 ),
+                 doc='range of effectiveness',
                  array_extent=('nlight',),
              ),
              StructFieldDecl(
@@ -2268,7 +2423,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='global position rel. to sub-com in qpos0 (nlight x 3)',
+                 doc='global position rel. to sub-com in qpos0',
+                 array_extent=('nlight', 3),
              ),
              StructFieldDecl(
                  name='light_pos0',
@@ -2403,7 +2559,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='detect contact if dist<margin(nflex x 1)',
+                 doc='detect contact if dist<margin',
+                 array_extent=('nflex',),
              ),
              StructFieldDecl(
                  name='flex_gap',
@@ -2434,7 +2591,16 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='number of active element layers, 3D only (nflex x 1)',
+                 doc='number of active element layers, 3D only',
+                 array_extent=('nflex',),
+             ),
+             StructFieldDecl(
+                 name='flex_passive',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='passive collisions enabled',
+                 array_extent=('nflex',),
              ),
              StructFieldDecl(
                  name='flex_dim',
@@ -2605,11 +2771,43 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nflexvert',),
              ),
              StructFieldDecl(
+                 name='flex_vertedgeadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='first edge address',
+                 array_extent=('nflexvert',),
+             ),
+             StructFieldDecl(
+                 name='flex_vertedgenum',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of edges',
+                 array_extent=('nflexvert',),
+             ),
+             StructFieldDecl(
+                 name='flex_vertedge',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='edge indices',
+                 array_extent=('nflexedge', 2),
+             ),
+             StructFieldDecl(
                  name='flex_edge',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
                  doc='edge vertex ids (2 per edge)',
+                 array_extent=('nflexedge', 2),
+             ),
+             StructFieldDecl(
+                 name='flex_edgeflap',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='adjacent vertex ids (dim=2 only)',
                  array_extent=('nflexedge', 2),
              ),
              StructFieldDecl(
@@ -2649,7 +2847,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='shell fragment vertex ids (dim per frag) (nflexshelldata x 1)',  # pylint: disable=line-too-long
+                 doc='shell fragment vertex ids (dim per frag)',
+                 array_extent=('nflexshelldata',),
              ),
              StructFieldDecl(
                  name='flex_evpair',
@@ -2674,6 +2873,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='vertex positions in qpos0 on [0, 1]^d',
                  array_extent=('nflexvert', 3),
+             ),
+             StructFieldDecl(
+                 name='flex_vertmetric',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='inverse of reference shape matrix',
+                 array_extent=('nflexvert', 4),
              ),
              StructFieldDecl(
                  name='flex_node',
@@ -2716,12 +2923,28 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nflex',),
              ),
              StructFieldDecl(
+                 name='flex_size',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='vertex bounding box half sizes in qpos0',
+                 array_extent=('nflex', 3),
+             ),
+             StructFieldDecl(
                  name='flex_stiffness',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc='finite element stiffness matrix',
                  array_extent=('nflexelem', 21),
+             ),
+             StructFieldDecl(
+                 name='flex_bending',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='bending stiffness',
+                 array_extent=('nflexedge', 17),
              ),
              StructFieldDecl(
                  name='flex_damping',
@@ -2750,9 +2973,9 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              StructFieldDecl(
                  name='flex_edgeequality',
                  type=PointerType(
-                     inner_type=ValueType(name='mjtByte'),
+                     inner_type=ValueType(name='int'),
                  ),
-                 doc='is edge equality constraint defined',
+                 doc='0: none, 1: edges, 2: vertices',
                  array_extent=('nflex',),
              ),
              StructFieldDecl(
@@ -2760,7 +2983,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtByte'),
                  ),
-                 doc='are all verices in the same body',
+                 doc='are all vertices in the same body',
                  array_extent=('nflex',),
              ),
              StructFieldDecl(
@@ -2802,6 +3025,54 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='number of bounding volumes',
                  array_extent=('nflex',),
+             ),
+             StructFieldDecl(
+                 name='flexedge_J_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of non-zeros in Jacobian row',
+                 array_extent=('nflexedge',),
+             ),
+             StructFieldDecl(
+                 name='flexedge_J_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='row start address in colind array',
+                 array_extent=('nflexedge',),
+             ),
+             StructFieldDecl(
+                 name='flexedge_J_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='column indices in sparse Jacobian',
+                 array_extent=('nJfe',),
+             ),
+             StructFieldDecl(
+                 name='flexvert_J_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of non-zeros in Jacobian row',
+                 array_extent=('nflexvert', 2),
+             ),
+             StructFieldDecl(
+                 name='flexvert_J_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='row start address in colind array',
+                 array_extent=('nflexvert', 2),
+             ),
+             StructFieldDecl(
+                 name='flexvert_J_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='column indices in sparse Jacobian',
+                 array_extent=('nJfv', 2),
              ),
              StructFieldDecl(
                  name='flex_rgba',
@@ -2865,6 +3136,22 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='int'),
                  ),
                  doc='number of bvh',
+                 array_extent=('nmesh',),
+             ),
+             StructFieldDecl(
+                 name='mesh_octadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='address of octree root',
+                 array_extent=('nmesh',),
+             ),
+             StructFieldDecl(
+                 name='mesh_octnum',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of octree nodes',
                  array_extent=('nmesh',),
              ),
              StructFieldDecl(
@@ -2992,7 +3279,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='address of asset path for mesh; -1: none (nmesh x 1)',
+                 doc='address of asset path for mesh; -1: none',
+                 array_extent=('nmesh',),
              ),
              StructFieldDecl(
                  name='mesh_polynum',
@@ -3239,7 +3527,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='address of asset path for skin; -1: none (nskin x 1)',
+                 doc='address of asset path for skin; -1: none',
+                 array_extent=('nskin',),
              ),
              StructFieldDecl(
                  name='hfield_size',
@@ -3295,6 +3584,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='int'),
                  ),
                  doc='texture type (mjtTexture)',
+                 array_extent=('ntex',),
+             ),
+             StructFieldDecl(
+                 name='tex_colorspace',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='texture colorspace (mjtColorSpace)',
                  array_extent=('ntex',),
              ),
              StructFieldDecl(
@@ -3454,7 +3751,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='body1<<16 + body2',
+                 doc='body1 << 16 + body2',
                  array_extent=('npair',),
              ),
              StructFieldDecl(
@@ -3486,7 +3783,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='detect contact if dist<margin(npair x 1)',
+                 doc='detect contact if dist<margin',
+                 array_extent=('npair',),
              ),
              StructFieldDecl(
                  name='pair_gap',
@@ -3509,7 +3807,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='body1<<16 + body2',
+                 doc='body1 << 16 + body2',
                  array_extent=('nexclude',),
              ),
              StructFieldDecl(
@@ -3581,7 +3879,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc="address of first object in tendon's path (ntendon x 1)",
+                 doc="address of first object in tendon's path",
+                 array_extent=('ntendon',),
              ),
              StructFieldDecl(
                  name='tendon_num',
@@ -3608,11 +3907,35 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('ntendon',),
              ),
              StructFieldDecl(
+                 name='tendon_treenum',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc="number of trees along tendon's path",
+                 array_extent=('ntendon',),
+             ),
+             StructFieldDecl(
+                 name='tendon_treeid',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc="first two trees along tendon's path",
+                 array_extent=('ntendon', 2),
+             ),
+             StructFieldDecl(
                  name='tendon_limited',
                  type=PointerType(
                      inner_type=ValueType(name='mjtByte'),
                  ),
                  doc='does tendon have length limits',
+                 array_extent=('ntendon',),
+             ),
+             StructFieldDecl(
+                 name='tendon_actfrclimited',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtByte'),
+                 ),
+                 doc='does tendon have actuator force limits',
                  array_extent=('ntendon',),
              ),
              StructFieldDecl(
@@ -3664,6 +3987,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('ntendon', 2),
              ),
              StructFieldDecl(
+                 name='tendon_actfrcrange',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='range of total actuator force',
+                 array_extent=('ntendon', 2),
+             ),
+             StructFieldDecl(
                  name='tendon_margin',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
@@ -3685,6 +4016,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc='damping coefficient',
+                 array_extent=('ntendon',),
+             ),
+             StructFieldDecl(
+                 name='tendon_armature',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='inertia associated with tendon velocity',
                  array_extent=('ntendon',),
              ),
              StructFieldDecl(
@@ -3821,6 +4160,30 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='int'),
                  ),
                  doc='group for visibility',
+                 array_extent=('nu',),
+             ),
+             StructFieldDecl(
+                 name='actuator_history',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='history buffer: [nsample, interp]',
+                 array_extent=('nu', 2),
+             ),
+             StructFieldDecl(
+                 name='actuator_historyadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='address in history buffer; -1: none',
+                 array_extent=('nu',),
+             ),
+             StructFieldDecl(
+                 name='actuator_delay',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='delay time in seconds; 0: no delay',
                  array_extent=('nu',),
              ),
              StructFieldDecl(
@@ -4016,6 +4379,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nsensor',),
              ),
              StructFieldDecl(
+                 name='sensor_intprm',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='sensor parameters',
+                 array_extent=('nsensor', 'mjNSENS'),
+             ),
+             StructFieldDecl(
                  name='sensor_dim',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
@@ -4046,6 +4417,38 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='noise standard deviation',
                  array_extent=('nsensor',),
+             ),
+             StructFieldDecl(
+                 name='sensor_history',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='history buffer: [nsample, interp]',
+                 array_extent=('nsensor', 2),
+             ),
+             StructFieldDecl(
+                 name='sensor_historyadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='address in history buffer; -1: none',
+                 array_extent=('nsensor',),
+             ),
+             StructFieldDecl(
+                 name='sensor_delay',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='delay time in seconds; 0: no delay',
+                 array_extent=('nsensor',),
+             ),
+             StructFieldDecl(
+                 name='sensor_interval',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='interval: [period, phase] in seconds',
+                 array_extent=('nsensor', 2),
              ),
              StructFieldDecl(
                  name='sensor_user',
@@ -4100,7 +4503,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc="address to each instance's config attrib (nplugin x 1)",
+                 doc="address to each instance's config attrib",
+                 array_extent=('nplugin',),
              ),
              StructFieldDecl(
                  name='numeric_adr',
@@ -4454,6 +4858,115 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='paths to assets, 0-terminated',
                  array_extent=('npaths',),
              ),
+             StructFieldDecl(
+                 name='B_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='body-dof: non-zeros in each row',
+                 array_extent=('nbody',),
+             ),
+             StructFieldDecl(
+                 name='B_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='body-dof: row addresses',
+                 array_extent=('nbody',),
+             ),
+             StructFieldDecl(
+                 name='B_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='body-dof: column indices',
+                 array_extent=('nB',),
+             ),
+             StructFieldDecl(
+                 name='M_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='reduced inertia: non-zeros in each row',
+                 array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='M_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='reduced inertia: row addresses',
+                 array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='M_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='reduced inertia: column indices',
+                 array_extent=('nC',),
+             ),
+             StructFieldDecl(
+                 name='mapM2M',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='index mapping from qM to M',
+                 array_extent=('nC',),
+             ),
+             StructFieldDecl(
+                 name='D_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='full inertia: non-zeros in each row',
+                 array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='D_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='full inertia: row addresses',
+                 array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='D_diag',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='full inertia: index of diagonal element',
+                 array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='D_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='full inertia: column indices',
+                 array_extent=('nD',),
+             ),
+             StructFieldDecl(
+                 name='mapM2D',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='index mapping from M to D',
+                 array_extent=('nD',),
+             ),
+             StructFieldDecl(
+                 name='mapD2M',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='index mapping from D to M',
+                 array_extent=('nC',),
+             ),
+             StructFieldDecl(
+                 name='signature',
+                 type=ValueType(name='uint64_t'),
+                 doc='also held by the mjSpec that compiled this model',
+             ),
          ),
      )),
     ('mjThreadPool',
@@ -4618,7 +5131,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              StructFieldDecl(
                  name='exclude',
                  type=ValueType(name='int'),
-                 doc='0: include, 1: in gap, 2: fused, 3: no dofs',
+                 doc='0: include, 1: in gap, 2: fused, 3: no dofs, 4: passive',
              ),
              StructFieldDecl(
                  name='efc_address',
@@ -4710,12 +5223,12 @@ STRUCTS: Mapping[str, StructDecl] = dict([
          fields=(
              StructFieldDecl(
                  name='narena',
-                 type=ValueType(name='size_t'),
+                 type=ValueType(name='mjtSize'),
                  doc='size of the arena in bytes (inclusive of the stack)',
              ),
              StructFieldDecl(
                  name='nbuffer',
-                 type=ValueType(name='size_t'),
+                 type=ValueType(name='mjtSize'),
                  doc='size of main buffer in bytes',
              ),
              StructFieldDecl(
@@ -4726,12 +5239,12 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              StructFieldDecl(
                  name='pstack',
                  type=ValueType(name='size_t'),
-                 doc='first available byte in stack',
+                 doc='first available byte in stack (mutable)',
              ),
              StructFieldDecl(
                  name='pbase',
                  type=ValueType(name='size_t'),
-                 doc='value of pstack when mj_markStack was last called',
+                 doc='value of pstack when mj_markStack was last called (mutable)',  # pylint: disable=line-too-long
              ),
              StructFieldDecl(
                  name='parena',
@@ -4740,20 +5253,20 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              ),
              StructFieldDecl(
                  name='maxuse_stack',
-                 type=ValueType(name='size_t'),
-                 doc='maximum stack allocation in bytes',
+                 type=ValueType(name='mjtSize'),
+                 doc='maximum stack allocation in bytes (mutable)',
              ),
              StructFieldDecl(
                  name='maxuse_threadstack',
                  type=ArrayType(
-                     inner_type=ValueType(name='size_t'),
+                     inner_type=ValueType(name='mjtSize'),
                      extents=(128,),
                  ),
                  doc='maximum stack allocation per thread in bytes',
              ),
              StructFieldDecl(
                  name='maxuse_arena',
-                 type=ValueType(name='size_t'),
+                 type=ValueType(name='mjtSize'),
                  doc='maximum arena allocation in bytes',
              ),
              StructFieldDecl(
@@ -4773,11 +5286,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      extents=(4000,),
                  ),
                  doc='solver statistics per island, per iteration',
-             ),
-             StructFieldDecl(
-                 name='solver_nisland',
-                 type=ValueType(name='int'),
-                 doc='number of islands processed by solver',
              ),
              StructFieldDecl(
                  name='solver_niter',
@@ -4809,7 +5317,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjWarningStat'),
                      extents=(8,),
                  ),
-                 doc='warning statistics',
+                 doc='warning statistics (mutable)',
              ),
              StructFieldDecl(
                  name='timer',
@@ -4858,6 +5366,51 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='nisland',
                  type=ValueType(name='int'),
                  doc='number of detected constraint islands',
+             ),
+             StructFieldDecl(
+                 name='nidof',
+                 type=ValueType(name='int'),
+                 doc='number of dofs in all islands',
+             ),
+             StructFieldDecl(
+                 name='ntree_awake',
+                 type=ValueType(name='int'),
+                 doc='number of awake trees',
+             ),
+             StructFieldDecl(
+                 name='nbody_awake',
+                 type=ValueType(name='int'),
+                 doc='number of awake dynamic and static bodies',
+             ),
+             StructFieldDecl(
+                 name='nparent_awake',
+                 type=ValueType(name='int'),
+                 doc='number of bodies with awake parents',
+             ),
+             StructFieldDecl(
+                 name='nv_awake',
+                 type=ValueType(name='int'),
+                 doc='number of awake dofs',
+             ),
+             StructFieldDecl(
+                 name='flg_energypos',
+                 type=ValueType(name='mjtByte'),
+                 doc='has mj_energyPos been called',
+             ),
+             StructFieldDecl(
+                 name='flg_energyvel',
+                 type=ValueType(name='mjtByte'),
+                 doc='has mj_energyVel been called',
+             ),
+             StructFieldDecl(
+                 name='flg_subtreevel',
+                 type=ValueType(name='mjtByte'),
+                 doc='has mj_subtreeVel been called',
+             ),
+             StructFieldDecl(
+                 name='flg_rnepost',
+                 type=ValueType(name='mjtByte'),
+                 doc='has mj_rnePostConstraint been called',
              ),
              StructFieldDecl(
                  name='time',
@@ -4909,6 +5462,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='actuator activation',
                  array_extent=('na',),
+             ),
+             StructFieldDecl(
+                 name='history',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='history buffer',
+                 array_extent=('nhistory',),
              ),
              StructFieldDecl(
                  name='qacc_warmstart',
@@ -5005,6 +5566,14 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='sensor data array',
                  array_extent=('nsensordata',),
+             ),
+             StructFieldDecl(
+                 name='tree_asleep',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='<0: awake; >=0: index cycle of sleeping trees',
+                 array_extent=('ntree',),
              ),
              StructFieldDecl(
                  name='plugin',
@@ -5183,36 +5752,12 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nflexelem', 6),
              ),
              StructFieldDecl(
-                 name='flexedge_J_rownnz',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='number of non-zeros in Jacobian row',
-                 array_extent=('nflexedge',),
-             ),
-             StructFieldDecl(
-                 name='flexedge_J_rowadr',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='row start address in colind array',
-                 array_extent=('nflexedge',),
-             ),
-             StructFieldDecl(
-                 name='flexedge_J_colind',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='column indices in sparse Jacobian',
-                 array_extent=('nflexedge', 'nv'),
-             ),
-             StructFieldDecl(
                  name='flexedge_J',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc='flex edge Jacobian',
-                 array_extent=('nflexedge', 'nv'),
+                 array_extent=('nJfe',),
              ),
              StructFieldDecl(
                  name='flexedge_length',
@@ -5221,6 +5766,30 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='flex edge lengths',
                  array_extent=('nflexedge',),
+             ),
+             StructFieldDecl(
+                 name='flexvert_J',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='flex vertex Jacobian',
+                 array_extent=('nJfv', 2),
+             ),
+             StructFieldDecl(
+                 name='flexvert_length',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='flex vertex lengths',
+                 array_extent=('nflexvert', 2),
+             ),
+             StructFieldDecl(
+                 name='bvh_aabb_dyn',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='global bounding box (center, size)',
+                 array_extent=('nbvhdynamic', 6),
              ),
              StructFieldDecl(
                  name='ten_wrapadr',
@@ -5347,8 +5916,16 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='total inertia (sparse)',
+                 doc='inertia (sparse)',
                  array_extent=('nM',),
+             ),
+             StructFieldDecl(
+                 name='M',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='reduced inertia (compressed sparse row)',
+                 array_extent=('nC',),
              ),
              StructFieldDecl(
                  name='qLD',
@@ -5356,7 +5933,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc="L'*D*L factorization of M (sparse)",
-                 array_extent=('nM',),
+                 array_extent=('nC',),
              ),
              StructFieldDecl(
                  name='qLDiagInv',
@@ -5367,20 +5944,52 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nv',),
              ),
              StructFieldDecl(
-                 name='bvh_aabb_dyn',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjtNum'),
-                 ),
-                 doc='global bounding box (center, size)',
-                 array_extent=('nbvhdynamic', 6),
-             ),
-             StructFieldDecl(
                  name='bvh_active',
                  type=PointerType(
                      inner_type=ValueType(name='mjtByte'),
                  ),
                  doc='was bounding volume checked for collision',
                  array_extent=('nbvh',),
+             ),
+             StructFieldDecl(
+                 name='tree_awake',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='is tree awake; 0: asleep; 1: awake',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
+                 name='body_awake',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='body sleep state (mjtSleepState)',
+                 array_extent=('nbody',),
+             ),
+             StructFieldDecl(
+                 name='body_awake_ind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='indices of awake and static bodies',
+                 array_extent=('nbody',),
+             ),
+             StructFieldDecl(
+                 name='parent_awake_ind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='indices of bodies with awake or static parents',
+                 array_extent=('nbody',),
+             ),
+             StructFieldDecl(
+                 name='dof_awake_ind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='indices of awake dofs',
+                 array_extent=('nv',),
              ),
              StructFieldDecl(
                  name='flexedge_velocity',
@@ -5492,7 +6101,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc="L'*D*L factorization of modified M",
-                 array_extent=('nM',),
+                 array_extent=('nC',),
              ),
              StructFieldDecl(
                  name='qHDiagInv',
@@ -5501,141 +6110,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='1/diag(D) of modified M',
                  array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='B_rownnz',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='body-dof: non-zeros in each row',
-                 array_extent=('nbody',),
-             ),
-             StructFieldDecl(
-                 name='B_rowadr',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='body-dof: address of each row in B_colind',
-                 array_extent=('nbody',),
-             ),
-             StructFieldDecl(
-                 name='B_colind',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='body-dof: column indices of non-zeros',
-                 array_extent=('nB',),
-             ),
-             StructFieldDecl(
-                 name='M_rownnz',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='inertia: non-zeros in each row',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='M_rowadr',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='inertia: address of each row in M_colind',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='M_colind',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='inertia: column indices of non-zeros',
-                 array_extent=('nM',),
-             ),
-             StructFieldDecl(
-                 name='mapM2M',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='index mapping from M (legacy) to M (CSR)',
-                 array_extent=('nM',),
-             ),
-             StructFieldDecl(
-                 name='C_rownnz',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='reduced dof-dof: non-zeros in each row',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='C_rowadr',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='reduced dof-dof: address of each row in C_colind (nv x 1)',  # pylint: disable=line-too-long
-             ),
-             StructFieldDecl(
-                 name='C_colind',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='reduced dof-dof: column indices of non-zeros',
-                 array_extent=('nC',),
-             ),
-             StructFieldDecl(
-                 name='mapM2C',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='index mapping from M to C',
-                 array_extent=('nC',),
-             ),
-             StructFieldDecl(
-                 name='D_rownnz',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='dof-dof: non-zeros in each row',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='D_rowadr',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='dof-dof: address of each row in D_colind',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='D_diag',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='dof-dof: index of diagonal element',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
-                 name='D_colind',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='dof-dof: column indices of non-zeros',
-                 array_extent=('nD',),
-             ),
-             StructFieldDecl(
-                 name='mapM2D',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='index mapping from M to D',
-                 array_extent=('nD',),
-             ),
-             StructFieldDecl(
-                 name='mapD2M',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='index mapping from D to M',
-                 array_extent=('nM',),
              ),
              StructFieldDecl(
                  name='qDeriv',
@@ -5698,7 +6172,8 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc="net external force; should equal:                (nv x 1)qfrc_applied + J'*xfrc_applied + qfrc_actuator",  # pylint: disable=line-too-long
+                 doc="net external force; should equal: qfrc_applied + J'*xfrc_applied + qfrc_actuator",  # pylint: disable=line-too-long
+                 array_extent=('nv',),
              ),
              StructFieldDecl(
                  name='cacc',
@@ -5781,47 +6256,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nJ',),
              ),
              StructFieldDecl(
-                 name='efc_JT_rownnz',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='number of non-zeros in constraint Jacobian row T (nv x 1)',  # pylint: disable=line-too-long
-             ),
-             StructFieldDecl(
-                 name='efc_JT_rowadr',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='row start address in colind array              T (nv x 1)',  # pylint: disable=line-too-long
-             ),
-             StructFieldDecl(
-                 name='efc_JT_rowsuper',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='number of subsequent rows in supernode         T (nv x 1)',  # pylint: disable=line-too-long
-             ),
-             StructFieldDecl(
-                 name='efc_JT_colind',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='column indices in constraint Jacobian          T (nJ x 1)',  # pylint: disable=line-too-long
-             ),
-             StructFieldDecl(
                  name='efc_J',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc='constraint Jacobian',
-                 array_extent=('nJ',),
-             ),
-             StructFieldDecl(
-                 name='efc_JT',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjtNum'),
-                 ),
-                 doc='constraint Jacobian transposed',
                  array_extent=('nJ',),
              ),
              StructFieldDecl(
@@ -5889,6 +6328,38 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('ntendon',),
              ),
              StructFieldDecl(
+                 name='tree_island',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='island id of this tree; -1: none',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
+                 name='island_ntree',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of trees in this island',
+                 array_extent=('nisland',),
+             ),
+             StructFieldDecl(
+                 name='island_itreeadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='island start address in itree vector',
+                 array_extent=('nisland',),
+             ),
+             StructFieldDecl(
+                 name='map_itree2tree',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='map from itree to tree',
+                 array_extent=('ntree',),
+             ),
+             StructFieldDecl(
                  name='dof_island',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
@@ -5897,11 +6368,19 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nv',),
              ),
              StructFieldDecl(
-                 name='island_dofnum',
+                 name='island_nv',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='number of dofs in island',
+                 doc='number of dofs in this island',
+                 array_extent=('nisland',),
+             ),
+             StructFieldDecl(
+                 name='island_idofadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='island start address in idof vector',
                  array_extent=('nisland',),
              ),
              StructFieldDecl(
@@ -5909,24 +6388,96 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='start address in island_dofind',
+                 doc='island start address in dof vector',
                  array_extent=('nisland',),
              ),
              StructFieldDecl(
-                 name='island_dofind',
+                 name='map_dof2idof',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='island dof indices; -1: none',
+                 doc='map from dof to idof',
                  array_extent=('nv',),
              ),
              StructFieldDecl(
-                 name='dof_islandind',
+                 name='map_idof2dof',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='dof island indices; -1: none',
+                 doc='map from idof to dof;  >= nidof: unconstrained',
                  array_extent=('nv',),
+             ),
+             StructFieldDecl(
+                 name='ifrc_smooth',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='net unconstrained force',
+                 array_extent=('nidof',),
+             ),
+             StructFieldDecl(
+                 name='iacc_smooth',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='unconstrained acceleration',
+                 array_extent=('nidof',),
+             ),
+             StructFieldDecl(
+                 name='iM_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='inertia: non-zeros in each row',
+                 array_extent=('nidof',),
+             ),
+             StructFieldDecl(
+                 name='iM_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='inertia: address of each row in iM_colind',
+                 array_extent=('nidof',),
+             ),
+             StructFieldDecl(
+                 name='iM_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='inertia: column indices of non-zeros',
+                 array_extent=('nC',),
+             ),
+             StructFieldDecl(
+                 name='iM',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='total inertia (sparse)',
+                 array_extent=('nC',),
+             ),
+             StructFieldDecl(
+                 name='iLD',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc="L'*D*L factorization of M (sparse)",
+                 array_extent=('nC',),
+             ),
+             StructFieldDecl(
+                 name='iLDiagInv',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='1/diag(D)',
+                 array_extent=('nidof',),
+             ),
+             StructFieldDecl(
+                 name='iacc',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='acceleration',
+                 array_extent=('nidof',),
              ),
              StructFieldDecl(
                  name='efc_island',
@@ -5937,7 +6488,23 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nefc',),
              ),
              StructFieldDecl(
-                 name='island_efcnum',
+                 name='island_ne',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of equality constraints in island',
+                 array_extent=('nisland',),
+             ),
+             StructFieldDecl(
+                 name='island_nf',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of friction constraints in island',
+                 array_extent=('nisland',),
+             ),
+             StructFieldDecl(
+                 name='island_nefc',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
@@ -5945,19 +6512,107 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nisland',),
              ),
              StructFieldDecl(
-                 name='island_efcadr',
+                 name='island_iefcadr',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='start address in island_efcind',
+                 doc='start address in iefc vector',
                  array_extent=('nisland',),
              ),
              StructFieldDecl(
-                 name='island_efcind',
+                 name='map_efc2iefc',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
                  ),
-                 doc='island constraint indices',
+                 doc='map from efc to iefc',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='map_iefc2efc',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='map from iefc to efc',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_type',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='constraint type (mjtConstraint)',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_id',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='id of object of specified type',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_J_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of non-zeros in constraint Jacobian row',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_J_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='row start address in colind array',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_J_rowsuper',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of subsequent rows in supernode',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_J_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='column indices in constraint Jacobian',
+                 array_extent=('nJ',),
+             ),
+             StructFieldDecl(
+                 name='iefc_J',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='constraint Jacobian',
+                 array_extent=('nJ',),
+             ),
+             StructFieldDecl(
+                 name='iefc_frictionloss',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='frictionloss (friction)',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_D',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='constraint mass',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_R',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='inverse constraint mass',
                  array_extent=('nefc',),
              ),
              StructFieldDecl(
@@ -6017,7 +6672,23 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nefc',),
              ),
              StructFieldDecl(
-                 name='efc_force',
+                 name='iefc_aref',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='reference pseudo-acceleration',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_state',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='constraint state (mjtConstraintState)',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='iefc_force',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
@@ -6033,9 +6704,2964 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nefc',),
              ),
              StructFieldDecl(
+                 name='efc_force',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='constraint force in constraint space',
+                 array_extent=('nefc',),
+             ),
+             StructFieldDecl(
+                 name='ifrc_constraint',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='constraint force',
+                 array_extent=('nidof',),
+             ),
+             StructFieldDecl(
                  name='threadpool',
                  type=ValueType(name='uintptr_t'),
                  doc='thread pool pointer',
+             ),
+             StructFieldDecl(
+                 name='signature',
+                 type=ValueType(name='uint64_t'),
+                 doc='also held by the mjSpec that compiled the model',
+             ),
+         ),
+     )),
+    ('mjsElement',
+     StructDecl(
+         name='mjsElement',
+         declname='struct mjsElement_',
+         fields=(
+             StructFieldDecl(
+                 name='elemtype',
+                 type=ValueType(name='mjtObj'),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='signature',
+                 type=ValueType(name='uint64_t'),
+                 doc='compilation signature',
+             ),
+         ),
+     )),
+    ('mjsCompiler',
+     StructDecl(
+         name='mjsCompiler',
+         declname='struct mjsCompiler_',
+         fields=(
+             StructFieldDecl(
+                 name='autolimits',
+                 type=ValueType(name='mjtByte'),
+                 doc='infer "limited" attribute based on range',
+             ),
+             StructFieldDecl(
+                 name='boundmass',
+                 type=ValueType(name='double'),
+                 doc='enforce minimum body mass',
+             ),
+             StructFieldDecl(
+                 name='boundinertia',
+                 type=ValueType(name='double'),
+                 doc='enforce minimum body diagonal inertia',
+             ),
+             StructFieldDecl(
+                 name='settotalmass',
+                 type=ValueType(name='double'),
+                 doc='rescale masses and inertias; <=0: ignore',
+             ),
+             StructFieldDecl(
+                 name='balanceinertia',
+                 type=ValueType(name='mjtByte'),
+                 doc='automatically impose A + B >= C rule',
+             ),
+             StructFieldDecl(
+                 name='fitaabb',
+                 type=ValueType(name='mjtByte'),
+                 doc='meshfit to aabb instead of inertia box',
+             ),
+             StructFieldDecl(
+                 name='degree',
+                 type=ValueType(name='mjtByte'),
+                 doc='angles in radians or degrees',
+             ),
+             StructFieldDecl(
+                 name='eulerseq',
+                 type=ArrayType(
+                     inner_type=ValueType(name='char'),
+                     extents=(3,),
+                 ),
+                 doc='sequence for euler rotations',
+             ),
+             StructFieldDecl(
+                 name='discardvisual',
+                 type=ValueType(name='mjtByte'),
+                 doc='discard visual geoms in parser',
+             ),
+             StructFieldDecl(
+                 name='usethread',
+                 type=ValueType(name='mjtByte'),
+                 doc='use multiple threads to speed up compiler',
+             ),
+             StructFieldDecl(
+                 name='fusestatic',
+                 type=ValueType(name='mjtByte'),
+                 doc='fuse static bodies with parent',
+             ),
+             StructFieldDecl(
+                 name='inertiafromgeom',
+                 type=ValueType(name='int'),
+                 doc='use geom inertias (mjtInertiaFromGeom)',
+             ),
+             StructFieldDecl(
+                 name='inertiagrouprange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='int'),
+                     extents=(2,),
+                 ),
+                 doc='range of geom groups used to compute inertia',
+             ),
+             StructFieldDecl(
+                 name='saveinertial',
+                 type=ValueType(name='mjtByte'),
+                 doc='save explicit inertial clause for all bodies to XML',
+             ),
+             StructFieldDecl(
+                 name='alignfree',
+                 type=ValueType(name='int'),
+                 doc='align free joints with inertial frame',
+             ),
+             StructFieldDecl(
+                 name='LRopt',
+                 type=ValueType(name='mjLROpt'),
+                 doc='options for lengthrange computation',
+             ),
+             StructFieldDecl(
+                 name='meshdir',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='mesh and hfield directory',
+             ),
+             StructFieldDecl(
+                 name='texturedir',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='texture directory',
+             ),
+         ),
+     )),
+    ('mjSpec',
+     StructDecl(
+         name='mjSpec',
+         declname='struct mjSpec_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='modelname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='model name',
+             ),
+             StructFieldDecl(
+                 name='compiler',
+                 type=ValueType(name='mjsCompiler'),
+                 doc='compiler options',
+             ),
+             StructFieldDecl(
+                 name='strippath',
+                 type=ValueType(name='mjtByte'),
+                 doc='automatically strip paths from mesh files',
+             ),
+             StructFieldDecl(
+                 name='option',
+                 type=ValueType(name='mjOption'),
+                 doc='physics options',
+             ),
+             StructFieldDecl(
+                 name='visual',
+                 type=ValueType(name='mjVisual'),
+                 doc='visual options',
+             ),
+             StructFieldDecl(
+                 name='stat',
+                 type=ValueType(name='mjStatistic'),
+                 doc='statistics override (if defined)',
+             ),
+             StructFieldDecl(
+                 name='memory',
+                 type=ValueType(name='mjtSize'),
+                 doc='number of bytes in arena+stack memory',
+             ),
+             StructFieldDecl(
+                 name='nemax',
+                 type=ValueType(name='int'),
+                 doc='max number of equality constraints',
+             ),
+             StructFieldDecl(
+                 name='nuserdata',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in userdata',
+             ),
+             StructFieldDecl(
+                 name='nuser_body',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in body_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_jnt',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in jnt_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_geom',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in geom_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_site',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in site_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_cam',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in cam_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_tendon',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in tendon_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_actuator',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in actuator_user',
+             ),
+             StructFieldDecl(
+                 name='nuser_sensor',
+                 type=ValueType(name='int'),
+                 doc='number of mjtNums in sensor_user',
+             ),
+             StructFieldDecl(
+                 name='nkey',
+                 type=ValueType(name='int'),
+                 doc='number of keyframes',
+             ),
+             StructFieldDecl(
+                 name='njmax',
+                 type=ValueType(name='int'),
+                 doc='(deprecated) max number of constraints',
+             ),
+             StructFieldDecl(
+                 name='nconmax',
+                 type=ValueType(name='int'),
+                 doc='(deprecated) max number of detected contacts',
+             ),
+             StructFieldDecl(
+                 name='nstack',
+                 type=ValueType(name='mjtSize'),
+                 doc='(deprecated) number of mjtNums in mjData stack',
+             ),
+             StructFieldDecl(
+                 name='comment',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='comment at top of XML',
+             ),
+             StructFieldDecl(
+                 name='modelfiledir',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='path to model file',
+             ),
+             StructFieldDecl(
+                 name='hasImplicitPluginElem',
+                 type=ValueType(name='mjtByte'),
+                 doc='already encountered an implicit plugin sensor/actuator',
+             ),
+         ),
+     )),
+    ('mjsOrientation',
+     StructDecl(
+         name='mjsOrientation',
+         declname='struct mjsOrientation_',
+         fields=(
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtOrientation'),
+                 doc='active orientation specifier',
+             ),
+             StructFieldDecl(
+                 name='axisangle',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='axis and angle',
+             ),
+             StructFieldDecl(
+                 name='xyaxes',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(6,),
+                 ),
+                 doc='x and y axes',
+             ),
+             StructFieldDecl(
+                 name='zaxis',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='z axis (minimal rotation)',
+             ),
+             StructFieldDecl(
+                 name='euler',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='Euler angles',
+             ),
+         ),
+     )),
+    ('mjsPlugin',
+     StructDecl(
+         name='mjsPlugin',
+         declname='struct mjsPlugin_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='name',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='instance name',
+             ),
+             StructFieldDecl(
+                 name='plugin_name',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='plugin name',
+             ),
+             StructFieldDecl(
+                 name='active',
+                 type=ValueType(name='mjtByte'),
+                 doc='is the plugin active',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsBody',
+     StructDecl(
+         name='mjsBody',
+         declname='struct mjsBody_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='childclass',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='childclass name',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='frame position',
+             ),
+             StructFieldDecl(
+                 name='quat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='frame orientation',
+             ),
+             StructFieldDecl(
+                 name='alt',
+                 type=ValueType(name='mjsOrientation'),
+                 doc='frame alternative orientation',
+             ),
+             StructFieldDecl(
+                 name='mass',
+                 type=ValueType(name='double'),
+                 doc='mass',
+             ),
+             StructFieldDecl(
+                 name='ipos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='inertial frame position',
+             ),
+             StructFieldDecl(
+                 name='iquat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='inertial frame orientation',
+             ),
+             StructFieldDecl(
+                 name='inertia',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='diagonal inertia (in i-frame)',
+             ),
+             StructFieldDecl(
+                 name='ialt',
+                 type=ValueType(name='mjsOrientation'),
+                 doc='inertial frame alternative orientation',
+             ),
+             StructFieldDecl(
+                 name='fullinertia',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(6,),
+                 ),
+                 doc='non-axis-aligned inertia matrix',
+             ),
+             StructFieldDecl(
+                 name='mocap',
+                 type=ValueType(name='mjtByte'),
+                 doc='is this a mocap body',
+             ),
+             StructFieldDecl(
+                 name='gravcomp',
+                 type=ValueType(name='double'),
+                 doc='gravity compensation',
+             ),
+             StructFieldDecl(
+                 name='sleep',
+                 type=ValueType(name='mjtSleepPolicy'),
+                 doc='sleep policy',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='explicitinertial',
+                 type=ValueType(name='mjtByte'),
+                 doc='whether to save the body with explicit inertial clause',
+             ),
+             StructFieldDecl(
+                 name='plugin',
+                 type=ValueType(name='mjsPlugin'),
+                 doc='passive force plugin',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsFrame',
+     StructDecl(
+         name='mjsFrame',
+         declname='struct mjsFrame_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='childclass',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='childclass name',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='position',
+             ),
+             StructFieldDecl(
+                 name='quat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='orientation',
+             ),
+             StructFieldDecl(
+                 name='alt',
+                 type=ValueType(name='mjsOrientation'),
+                 doc='alternative orientation',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsJoint',
+     StructDecl(
+         name='mjsJoint',
+         declname='struct mjsJoint_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtJoint'),
+                 doc='joint type',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='anchor position',
+             ),
+             StructFieldDecl(
+                 name='axis',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='joint axis',
+             ),
+             StructFieldDecl(
+                 name='ref',
+                 type=ValueType(name='double'),
+                 doc='value at reference configuration: qpos0',
+             ),
+             StructFieldDecl(
+                 name='align',
+                 type=ValueType(name='int'),
+                 doc='align free joint with body com (mjtAlignFree)',
+             ),
+             StructFieldDecl(
+                 name='stiffness',
+                 type=ValueType(name='double'),
+                 doc='stiffness coefficient',
+             ),
+             StructFieldDecl(
+                 name='springref',
+                 type=ValueType(name='double'),
+                 doc='spring reference value: qpos_spring',
+             ),
+             StructFieldDecl(
+                 name='springdamper',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='timeconst, dampratio',
+             ),
+             StructFieldDecl(
+                 name='limited',
+                 type=ValueType(name='int'),
+                 doc='does joint have limits (mjtLimited)',
+             ),
+             StructFieldDecl(
+                 name='range',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='joint limits',
+             ),
+             StructFieldDecl(
+                 name='margin',
+                 type=ValueType(name='double'),
+                 doc='margin value for joint limit detection',
+             ),
+             StructFieldDecl(
+                 name='solref_limit',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference: joint limits',
+             ),
+             StructFieldDecl(
+                 name='solimp_limit',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance: joint limits',
+             ),
+             StructFieldDecl(
+                 name='actfrclimited',
+                 type=ValueType(name='int'),
+                 doc='are actuator forces on joint limited (mjtLimited)',
+             ),
+             StructFieldDecl(
+                 name='actfrcrange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='actuator force limits',
+             ),
+             StructFieldDecl(
+                 name='armature',
+                 type=ValueType(name='double'),
+                 doc='armature inertia (mass for slider)',
+             ),
+             StructFieldDecl(
+                 name='damping',
+                 type=ValueType(name='double'),
+                 doc='damping coefficient',
+             ),
+             StructFieldDecl(
+                 name='frictionloss',
+                 type=ValueType(name='double'),
+                 doc='friction loss',
+             ),
+             StructFieldDecl(
+                 name='solref_friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference: dof friction',
+             ),
+             StructFieldDecl(
+                 name='solimp_friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance: dof friction',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group',
+             ),
+             StructFieldDecl(
+                 name='actgravcomp',
+                 type=ValueType(name='mjtByte'),
+                 doc='is gravcomp force applied via actuators',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsGeom',
+     StructDecl(
+         name='mjsGeom',
+         declname='struct mjsGeom_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtGeom'),
+                 doc='geom type',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='position',
+             ),
+             StructFieldDecl(
+                 name='quat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='orientation',
+             ),
+             StructFieldDecl(
+                 name='alt',
+                 type=ValueType(name='mjsOrientation'),
+                 doc='alternative orientation',
+             ),
+             StructFieldDecl(
+                 name='fromto',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(6,),
+                 ),
+                 doc='alternative for capsule, cylinder, box, ellipsoid',
+             ),
+             StructFieldDecl(
+                 name='size',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='type-specific size',
+             ),
+             StructFieldDecl(
+                 name='contype',
+                 type=ValueType(name='int'),
+                 doc='contact type',
+             ),
+             StructFieldDecl(
+                 name='conaffinity',
+                 type=ValueType(name='int'),
+                 doc='contact affinity',
+             ),
+             StructFieldDecl(
+                 name='condim',
+                 type=ValueType(name='int'),
+                 doc='contact dimensionality',
+             ),
+             StructFieldDecl(
+                 name='priority',
+                 type=ValueType(name='int'),
+                 doc='contact priority',
+             ),
+             StructFieldDecl(
+                 name='friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='one-sided friction coefficients: slide, roll, spin',
+             ),
+             StructFieldDecl(
+                 name='solmix',
+                 type=ValueType(name='double'),
+                 doc='solver mixing for contact pairs',
+             ),
+             StructFieldDecl(
+                 name='solref',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference',
+             ),
+             StructFieldDecl(
+                 name='solimp',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance',
+             ),
+             StructFieldDecl(
+                 name='margin',
+                 type=ValueType(name='double'),
+                 doc='margin for contact detection',
+             ),
+             StructFieldDecl(
+                 name='gap',
+                 type=ValueType(name='double'),
+                 doc='include in solver if dist < margin-gap',
+             ),
+             StructFieldDecl(
+                 name='mass',
+                 type=ValueType(name='double'),
+                 doc='used to compute density',
+             ),
+             StructFieldDecl(
+                 name='density',
+                 type=ValueType(name='double'),
+                 doc='used to compute mass and inertia from volume or surface',
+             ),
+             StructFieldDecl(
+                 name='typeinertia',
+                 type=ValueType(name='mjtGeomInertia'),
+                 doc='selects between surface and volume inertia',
+             ),
+             StructFieldDecl(
+                 name='fluid_ellipsoid',
+                 type=ValueType(name='mjtNum'),
+                 doc='whether ellipsoid-fluid model is active',
+             ),
+             StructFieldDecl(
+                 name='fluid_coefs',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='ellipsoid-fluid interaction coefs',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of material',
+             ),
+             StructFieldDecl(
+                 name='rgba',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='rgba when material is omitted',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group',
+             ),
+             StructFieldDecl(
+                 name='hfieldname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='heightfield attached to geom',
+             ),
+             StructFieldDecl(
+                 name='meshname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='mesh attached to geom',
+             ),
+             StructFieldDecl(
+                 name='fitscale',
+                 type=ValueType(name='double'),
+                 doc='scale mesh uniformly',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='plugin',
+                 type=ValueType(name='mjsPlugin'),
+                 doc='sdf plugin',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsSite',
+     StructDecl(
+         name='mjsSite',
+         declname='struct mjsSite_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='position',
+             ),
+             StructFieldDecl(
+                 name='quat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='orientation',
+             ),
+             StructFieldDecl(
+                 name='alt',
+                 type=ValueType(name='mjsOrientation'),
+                 doc='alternative orientation',
+             ),
+             StructFieldDecl(
+                 name='fromto',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(6,),
+                 ),
+                 doc='alternative for capsule, cylinder, box, ellipsoid',
+             ),
+             StructFieldDecl(
+                 name='size',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='geom size',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtGeom'),
+                 doc='geom type',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of material',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group',
+             ),
+             StructFieldDecl(
+                 name='rgba',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='rgba when material is omitted',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsCamera',
+     StructDecl(
+         name='mjsCamera',
+         declname='struct mjsCamera_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='position',
+             ),
+             StructFieldDecl(
+                 name='quat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='orientation',
+             ),
+             StructFieldDecl(
+                 name='alt',
+                 type=ValueType(name='mjsOrientation'),
+                 doc='alternative orientation',
+             ),
+             StructFieldDecl(
+                 name='mode',
+                 type=ValueType(name='mjtCamLight'),
+                 doc='tracking mode',
+             ),
+             StructFieldDecl(
+                 name='targetbody',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='target body for tracking/targeting',
+             ),
+             StructFieldDecl(
+                 name='proj',
+                 type=ValueType(name='mjtProjection'),
+                 doc='camera projection type',
+             ),
+             StructFieldDecl(
+                 name='resolution',
+                 type=ArrayType(
+                     inner_type=ValueType(name='int'),
+                     extents=(2,),
+                 ),
+                 doc='resolution (pixel)',
+             ),
+             StructFieldDecl(
+                 name='output',
+                 type=ValueType(name='int'),
+                 doc='bit flags for output type',
+             ),
+             StructFieldDecl(
+                 name='fovy',
+                 type=ValueType(name='double'),
+                 doc='y-field of view',
+             ),
+             StructFieldDecl(
+                 name='ipd',
+                 type=ValueType(name='double'),
+                 doc='inter-pupillary distance',
+             ),
+             StructFieldDecl(
+                 name='intrinsic',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='camera intrinsics (length)',
+             ),
+             StructFieldDecl(
+                 name='sensor_size',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(2,),
+                 ),
+                 doc='sensor size (length)',
+             ),
+             StructFieldDecl(
+                 name='focal_length',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(2,),
+                 ),
+                 doc='focal length (length)',
+             ),
+             StructFieldDecl(
+                 name='focal_pixel',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(2,),
+                 ),
+                 doc='focal length (pixel)',
+             ),
+             StructFieldDecl(
+                 name='principal_length',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(2,),
+                 ),
+                 doc='principal point (length)',
+             ),
+             StructFieldDecl(
+                 name='principal_pixel',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(2,),
+                 ),
+                 doc='principal point (pixel)',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsLight',
+     StructDecl(
+         name='mjsLight',
+         declname='struct mjsLight_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='pos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='position',
+             ),
+             StructFieldDecl(
+                 name='dir',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='direction',
+             ),
+             StructFieldDecl(
+                 name='mode',
+                 type=ValueType(name='mjtCamLight'),
+                 doc='tracking mode',
+             ),
+             StructFieldDecl(
+                 name='targetbody',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='target body for targeting',
+             ),
+             StructFieldDecl(
+                 name='active',
+                 type=ValueType(name='mjtByte'),
+                 doc='is light active',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtLightType'),
+                 doc='type of light',
+             ),
+             StructFieldDecl(
+                 name='texture',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='texture name for image lights',
+             ),
+             StructFieldDecl(
+                 name='castshadow',
+                 type=ValueType(name='mjtByte'),
+                 doc='does light cast shadows',
+             ),
+             StructFieldDecl(
+                 name='bulbradius',
+                 type=ValueType(name='float'),
+                 doc='bulb radius, for soft shadows',
+             ),
+             StructFieldDecl(
+                 name='intensity',
+                 type=ValueType(name='float'),
+                 doc='intensity, in candelas',
+             ),
+             StructFieldDecl(
+                 name='range',
+                 type=ValueType(name='float'),
+                 doc='range of effectiveness',
+             ),
+             StructFieldDecl(
+                 name='attenuation',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(3,),
+                 ),
+                 doc='OpenGL attenuation (quadratic model)',
+             ),
+             StructFieldDecl(
+                 name='cutoff',
+                 type=ValueType(name='float'),
+                 doc='OpenGL cutoff',
+             ),
+             StructFieldDecl(
+                 name='exponent',
+                 type=ValueType(name='float'),
+                 doc='OpenGL exponent',
+             ),
+             StructFieldDecl(
+                 name='ambient',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(3,),
+                 ),
+                 doc='ambient color',
+             ),
+             StructFieldDecl(
+                 name='diffuse',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(3,),
+                 ),
+                 doc='diffuse color',
+             ),
+             StructFieldDecl(
+                 name='specular',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(3,),
+                 ),
+                 doc='specular color',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errorsx',
+             ),
+         ),
+     )),
+    ('mjsFlex',
+     StructDecl(
+         name='mjsFlex',
+         declname='struct mjsFlex_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='contype',
+                 type=ValueType(name='int'),
+                 doc='contact type',
+             ),
+             StructFieldDecl(
+                 name='conaffinity',
+                 type=ValueType(name='int'),
+                 doc='contact affinity',
+             ),
+             StructFieldDecl(
+                 name='condim',
+                 type=ValueType(name='int'),
+                 doc='contact dimensionality',
+             ),
+             StructFieldDecl(
+                 name='priority',
+                 type=ValueType(name='int'),
+                 doc='contact priority',
+             ),
+             StructFieldDecl(
+                 name='friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='one-sided friction coefficients: slide, roll, spin',
+             ),
+             StructFieldDecl(
+                 name='solmix',
+                 type=ValueType(name='double'),
+                 doc='solver mixing for contact pairs',
+             ),
+             StructFieldDecl(
+                 name='solref',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference',
+             ),
+             StructFieldDecl(
+                 name='solimp',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance',
+             ),
+             StructFieldDecl(
+                 name='margin',
+                 type=ValueType(name='double'),
+                 doc='margin for contact detection',
+             ),
+             StructFieldDecl(
+                 name='gap',
+                 type=ValueType(name='double'),
+                 doc='include in solver if dist<margin-gap',
+             ),
+             StructFieldDecl(
+                 name='dim',
+                 type=ValueType(name='int'),
+                 doc='element dimensionality',
+             ),
+             StructFieldDecl(
+                 name='radius',
+                 type=ValueType(name='double'),
+                 doc='radius around primitive element',
+             ),
+             StructFieldDecl(
+                 name='size',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='vertex bounding box half sizes in qpos0',
+             ),
+             StructFieldDecl(
+                 name='internal',
+                 type=ValueType(name='mjtByte'),
+                 doc='enable internal collisions',
+             ),
+             StructFieldDecl(
+                 name='flatskin',
+                 type=ValueType(name='mjtByte'),
+                 doc='render flex skin with flat shading',
+             ),
+             StructFieldDecl(
+                 name='selfcollide',
+                 type=ValueType(name='int'),
+                 doc='mode for flex self collision',
+             ),
+             StructFieldDecl(
+                 name='vertcollide',
+                 type=ValueType(name='int'),
+                 doc='mode for vertex collision',
+             ),
+             StructFieldDecl(
+                 name='passive',
+                 type=ValueType(name='int'),
+                 doc='mode for passive collisions',
+             ),
+             StructFieldDecl(
+                 name='activelayers',
+                 type=ValueType(name='int'),
+                 doc='number of active element layers in 3D',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group for visualization',
+             ),
+             StructFieldDecl(
+                 name='edgestiffness',
+                 type=ValueType(name='double'),
+                 doc='edge stiffness',
+             ),
+             StructFieldDecl(
+                 name='edgedamping',
+                 type=ValueType(name='double'),
+                 doc='edge damping',
+             ),
+             StructFieldDecl(
+                 name='rgba',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='rgba when material is omitted',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of material used for rendering',
+             ),
+             StructFieldDecl(
+                 name='young',
+                 type=ValueType(name='double'),
+                 doc="Young's modulus",
+             ),
+             StructFieldDecl(
+                 name='poisson',
+                 type=ValueType(name='double'),
+                 doc="Poisson's ratio",
+             ),
+             StructFieldDecl(
+                 name='damping',
+                 type=ValueType(name='double'),
+                 doc="Rayleigh's damping",
+             ),
+             StructFieldDecl(
+                 name='thickness',
+                 type=ValueType(name='double'),
+                 doc='thickness (2D only)',
+             ),
+             StructFieldDecl(
+                 name='elastic2d',
+                 type=ValueType(name='int'),
+                 doc='2D passive forces; 0: none, 1: bending, 2: stretching, 3: both',  # pylint: disable=line-too-long
+             ),
+             StructFieldDecl(
+                 name='nodebody',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjStringVec'),
+                 ),
+                 doc='node body names',
+             ),
+             StructFieldDecl(
+                 name='vertbody',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjStringVec'),
+                 ),
+                 doc='vertex body names',
+             ),
+             StructFieldDecl(
+                 name='node',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='node positions',
+             ),
+             StructFieldDecl(
+                 name='vert',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='vertex positions',
+             ),
+             StructFieldDecl(
+                 name='elem',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='element vertex ids',
+             ),
+             StructFieldDecl(
+                 name='texcoord',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='vertex texture coordinates',
+             ),
+             StructFieldDecl(
+                 name='elemtexcoord',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='element texture coordinates',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsMesh',
+     StructDecl(
+         name='mjsMesh',
+         declname='struct mjsMesh_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='content_type',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='content type of file',
+             ),
+             StructFieldDecl(
+                 name='file',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='mesh file',
+             ),
+             StructFieldDecl(
+                 name='refpos',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='reference position',
+             ),
+             StructFieldDecl(
+                 name='refquat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='reference orientation',
+             ),
+             StructFieldDecl(
+                 name='scale',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='rescale mesh',
+             ),
+             StructFieldDecl(
+                 name='inertia',
+                 type=ValueType(name='mjtMeshInertia'),
+                 doc='inertia type (convex, legacy, exact, shell)',
+             ),
+             StructFieldDecl(
+                 name='smoothnormal',
+                 type=ValueType(name='mjtByte'),
+                 doc='do not exclude large-angle faces from normals',
+             ),
+             StructFieldDecl(
+                 name='needsdf',
+                 type=ValueType(name='mjtByte'),
+                 doc='compute sdf from mesh',
+             ),
+             StructFieldDecl(
+                 name='maxhullvert',
+                 type=ValueType(name='int'),
+                 doc='maximum vertex count for the convex hull',
+             ),
+             StructFieldDecl(
+                 name='uservert',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='user vertex data',
+             ),
+             StructFieldDecl(
+                 name='usernormal',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='user normal data',
+             ),
+             StructFieldDecl(
+                 name='usertexcoord',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='user texcoord data',
+             ),
+             StructFieldDecl(
+                 name='userface',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='user vertex indices',
+             ),
+             StructFieldDecl(
+                 name='userfacenormal',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='user face normal indices',
+             ),
+             StructFieldDecl(
+                 name='userfacetexcoord',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='user texcoord indices',
+             ),
+             StructFieldDecl(
+                 name='plugin',
+                 type=ValueType(name='mjsPlugin'),
+                 doc='sdf plugin',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of material',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsHField',
+     StructDecl(
+         name='mjsHField',
+         declname='struct mjsHField_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='content_type',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='content type of file',
+             ),
+             StructFieldDecl(
+                 name='file',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='file: (nrow, ncol, [elevation data])',
+             ),
+             StructFieldDecl(
+                 name='size',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(4,),
+                 ),
+                 doc='hfield size (ignore referencing geom size)',
+             ),
+             StructFieldDecl(
+                 name='nrow',
+                 type=ValueType(name='int'),
+                 doc='number of rows',
+             ),
+             StructFieldDecl(
+                 name='ncol',
+                 type=ValueType(name='int'),
+                 doc='number of columns',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='user-provided elevation data',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsSkin',
+     StructDecl(
+         name='mjsSkin',
+         declname='struct mjsSkin_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='file',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='skin file',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of material used for rendering',
+             ),
+             StructFieldDecl(
+                 name='rgba',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='rgba when material is omitted',
+             ),
+             StructFieldDecl(
+                 name='inflate',
+                 type=ValueType(name='float'),
+                 doc='inflate in normal direction',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group for visualization',
+             ),
+             StructFieldDecl(
+                 name='vert',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='vertex positions',
+             ),
+             StructFieldDecl(
+                 name='texcoord',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='texture coordinates',
+             ),
+             StructFieldDecl(
+                 name='face',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='faces',
+             ),
+             StructFieldDecl(
+                 name='bodyname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjStringVec'),
+                 ),
+                 doc='body names',
+             ),
+             StructFieldDecl(
+                 name='bindpos',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='bind pos',
+             ),
+             StructFieldDecl(
+                 name='bindquat',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVec'),
+                 ),
+                 doc='bind quat',
+             ),
+             StructFieldDecl(
+                 name='vertid',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVecVec'),
+                 ),
+                 doc='vertex ids',
+             ),
+             StructFieldDecl(
+                 name='vertweight',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjFloatVecVec'),
+                 ),
+                 doc='vertex weights',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsTexture',
+     StructDecl(
+         name='mjsTexture',
+         declname='struct mjsTexture_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtTexture'),
+                 doc='texture type',
+             ),
+             StructFieldDecl(
+                 name='colorspace',
+                 type=ValueType(name='mjtColorSpace'),
+                 doc='colorspace',
+             ),
+             StructFieldDecl(
+                 name='builtin',
+                 type=ValueType(name='int'),
+                 doc='builtin type (mjtBuiltin)',
+             ),
+             StructFieldDecl(
+                 name='mark',
+                 type=ValueType(name='int'),
+                 doc='mark type (mjtMark)',
+             ),
+             StructFieldDecl(
+                 name='rgb1',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='first color for builtin',
+             ),
+             StructFieldDecl(
+                 name='rgb2',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='second color for builtin',
+             ),
+             StructFieldDecl(
+                 name='markrgb',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(3,),
+                 ),
+                 doc='mark color',
+             ),
+             StructFieldDecl(
+                 name='random',
+                 type=ValueType(name='double'),
+                 doc='probability of random dots',
+             ),
+             StructFieldDecl(
+                 name='height',
+                 type=ValueType(name='int'),
+                 doc='height in pixels (square for cube and skybox)',
+             ),
+             StructFieldDecl(
+                 name='width',
+                 type=ValueType(name='int'),
+                 doc='width in pixels',
+             ),
+             StructFieldDecl(
+                 name='nchannel',
+                 type=ValueType(name='int'),
+                 doc='number of channels',
+             ),
+             StructFieldDecl(
+                 name='content_type',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='content type of file',
+             ),
+             StructFieldDecl(
+                 name='file',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='png file to load; use for all sides of cube',
+             ),
+             StructFieldDecl(
+                 name='gridsize',
+                 type=ArrayType(
+                     inner_type=ValueType(name='int'),
+                     extents=(2,),
+                 ),
+                 doc='size of grid for composite file; (1,1)-repeat',
+             ),
+             StructFieldDecl(
+                 name='gridlayout',
+                 type=ArrayType(
+                     inner_type=ValueType(name='char'),
+                     extents=(12,),
+                 ),
+                 doc='row-major: L,R,F,B,U,D for faces; . for unused',
+             ),
+             StructFieldDecl(
+                 name='cubefiles',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjStringVec'),
+                 ),
+                 doc='different file for each side of the cube',
+             ),
+             StructFieldDecl(
+                 name='data',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjByteVec'),
+                 ),
+                 doc='texture data',
+             ),
+             StructFieldDecl(
+                 name='hflip',
+                 type=ValueType(name='mjtByte'),
+                 doc='horizontal flip',
+             ),
+             StructFieldDecl(
+                 name='vflip',
+                 type=ValueType(name='mjtByte'),
+                 doc='vertical flip',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsMaterial',
+     StructDecl(
+         name='mjsMaterial',
+         declname='struct mjsMaterial_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='textures',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjStringVec'),
+                 ),
+                 doc='names of textures (empty: none)',
+             ),
+             StructFieldDecl(
+                 name='texuniform',
+                 type=ValueType(name='mjtByte'),
+                 doc='make texture cube uniform',
+             ),
+             StructFieldDecl(
+                 name='texrepeat',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(2,),
+                 ),
+                 doc='texture repetition for 2D mapping',
+             ),
+             StructFieldDecl(
+                 name='emission',
+                 type=ValueType(name='float'),
+                 doc='emission',
+             ),
+             StructFieldDecl(
+                 name='specular',
+                 type=ValueType(name='float'),
+                 doc='specular',
+             ),
+             StructFieldDecl(
+                 name='shininess',
+                 type=ValueType(name='float'),
+                 doc='shininess',
+             ),
+             StructFieldDecl(
+                 name='reflectance',
+                 type=ValueType(name='float'),
+                 doc='reflectance',
+             ),
+             StructFieldDecl(
+                 name='metallic',
+                 type=ValueType(name='float'),
+                 doc='metallic',
+             ),
+             StructFieldDecl(
+                 name='roughness',
+                 type=ValueType(name='float'),
+                 doc='roughness',
+             ),
+             StructFieldDecl(
+                 name='rgba',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='rgba',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsPair',
+     StructDecl(
+         name='mjsPair',
+         declname='struct mjsPair_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='geomname1',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of geom 1',
+             ),
+             StructFieldDecl(
+                 name='geomname2',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of geom 2',
+             ),
+             StructFieldDecl(
+                 name='condim',
+                 type=ValueType(name='int'),
+                 doc='contact dimensionality',
+             ),
+             StructFieldDecl(
+                 name='solref',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference, normal direction',
+             ),
+             StructFieldDecl(
+                 name='solreffriction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference, frictional directions',
+             ),
+             StructFieldDecl(
+                 name='solimp',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance',
+             ),
+             StructFieldDecl(
+                 name='margin',
+                 type=ValueType(name='double'),
+                 doc='margin for contact detection',
+             ),
+             StructFieldDecl(
+                 name='gap',
+                 type=ValueType(name='double'),
+                 doc='include in solver if dist<margin-gap',
+             ),
+             StructFieldDecl(
+                 name='friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(5,),
+                 ),
+                 doc='full contact friction',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to errors',
+             ),
+         ),
+     )),
+    ('mjsExclude',
+     StructDecl(
+         name='mjsExclude',
+         declname='struct mjsExclude_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='bodyname1',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of geom 1',
+             ),
+             StructFieldDecl(
+                 name='bodyname2',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of geom 2',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to errors',
+             ),
+         ),
+     )),
+    ('mjsEquality',
+     StructDecl(
+         name='mjsEquality',
+         declname='struct mjsEquality_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtEq'),
+                 doc='constraint type',
+             ),
+             StructFieldDecl(
+                 name='data',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(11,),
+                 ),
+                 doc='type-dependent data',
+             ),
+             StructFieldDecl(
+                 name='active',
+                 type=ValueType(name='mjtByte'),
+                 doc='is equality initially active',
+             ),
+             StructFieldDecl(
+                 name='name1',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of object 1',
+             ),
+             StructFieldDecl(
+                 name='name2',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of object 2',
+             ),
+             StructFieldDecl(
+                 name='objtype',
+                 type=ValueType(name='mjtObj'),
+                 doc='type of both objects',
+             ),
+             StructFieldDecl(
+                 name='solref',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference',
+             ),
+             StructFieldDecl(
+                 name='solimp',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to errors',
+             ),
+         ),
+     )),
+    ('mjsTendon',
+     StructDecl(
+         name='mjsTendon',
+         declname='struct mjsTendon_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='stiffness',
+                 type=ValueType(name='double'),
+                 doc='stiffness coefficient',
+             ),
+             StructFieldDecl(
+                 name='springlength',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='spring resting length; {-1, -1}: use qpos_spring',
+             ),
+             StructFieldDecl(
+                 name='damping',
+                 type=ValueType(name='double'),
+                 doc='damping coefficient',
+             ),
+             StructFieldDecl(
+                 name='frictionloss',
+                 type=ValueType(name='double'),
+                 doc='friction loss',
+             ),
+             StructFieldDecl(
+                 name='solref_friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference: tendon friction',
+             ),
+             StructFieldDecl(
+                 name='solimp_friction',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance: tendon friction',
+             ),
+             StructFieldDecl(
+                 name='armature',
+                 type=ValueType(name='double'),
+                 doc='inertia associated with tendon velocity',
+             ),
+             StructFieldDecl(
+                 name='limited',
+                 type=ValueType(name='int'),
+                 doc='does tendon have limits (mjtLimited)',
+             ),
+             StructFieldDecl(
+                 name='actfrclimited',
+                 type=ValueType(name='int'),
+                 doc='does tendon have actuator force limits',
+             ),
+             StructFieldDecl(
+                 name='range',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='length limits',
+             ),
+             StructFieldDecl(
+                 name='actfrcrange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='actuator force limits',
+             ),
+             StructFieldDecl(
+                 name='margin',
+                 type=ValueType(name='double'),
+                 doc='margin value for tendon limit detection',
+             ),
+             StructFieldDecl(
+                 name='solref_limit',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(2,),
+                 ),
+                 doc='solver reference: tendon limits',
+             ),
+             StructFieldDecl(
+                 name='solimp_limit',
+                 type=ArrayType(
+                     inner_type=ValueType(name='mjtNum'),
+                     extents=(5,),
+                 ),
+                 doc='solver impedance: tendon limits',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of material for rendering',
+             ),
+             StructFieldDecl(
+                 name='width',
+                 type=ValueType(name='double'),
+                 doc='width for rendering',
+             ),
+             StructFieldDecl(
+                 name='rgba',
+                 type=ArrayType(
+                     inner_type=ValueType(name='float'),
+                     extents=(4,),
+                 ),
+                 doc='rgba when material is omitted',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to errors',
+             ),
+         ),
+     )),
+    ('mjsWrap',
+     StructDecl(
+         name='mjsWrap',
+         declname='struct mjsWrap_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtWrap'),
+                 doc='wrap type',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to errors',
+             ),
+         ),
+     )),
+    ('mjsActuator',
+     StructDecl(
+         name='mjsActuator',
+         declname='struct mjsActuator_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='gaintype',
+                 type=ValueType(name='mjtGain'),
+                 doc='gain type',
+             ),
+             StructFieldDecl(
+                 name='gainprm',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(10,),
+                 ),
+                 doc='gain parameters',
+             ),
+             StructFieldDecl(
+                 name='biastype',
+                 type=ValueType(name='mjtBias'),
+                 doc='bias type',
+             ),
+             StructFieldDecl(
+                 name='biasprm',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(10,),
+                 ),
+                 doc='bias parameters',
+             ),
+             StructFieldDecl(
+                 name='dyntype',
+                 type=ValueType(name='mjtDyn'),
+                 doc='dynamics type',
+             ),
+             StructFieldDecl(
+                 name='dynprm',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(10,),
+                 ),
+                 doc='dynamics parameters',
+             ),
+             StructFieldDecl(
+                 name='actdim',
+                 type=ValueType(name='int'),
+                 doc='number of activation variables',
+             ),
+             StructFieldDecl(
+                 name='actearly',
+                 type=ValueType(name='mjtByte'),
+                 doc='apply next activations to qfrc',
+             ),
+             StructFieldDecl(
+                 name='trntype',
+                 type=ValueType(name='mjtTrn'),
+                 doc='transmission type',
+             ),
+             StructFieldDecl(
+                 name='gear',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(6,),
+                 ),
+                 doc='length and transmitted force scaling',
+             ),
+             StructFieldDecl(
+                 name='target',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of transmission target',
+             ),
+             StructFieldDecl(
+                 name='refsite',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='reference site, for site transmission',
+             ),
+             StructFieldDecl(
+                 name='slidersite',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='site defining cylinder, for slider-crank',
+             ),
+             StructFieldDecl(
+                 name='cranklength',
+                 type=ValueType(name='double'),
+                 doc='crank length, for slider-crank',
+             ),
+             StructFieldDecl(
+                 name='lengthrange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='transmission length range',
+             ),
+             StructFieldDecl(
+                 name='inheritrange',
+                 type=ValueType(name='double'),
+                 doc='automatic range setting for position and intvelocity',
+             ),
+             StructFieldDecl(
+                 name='ctrllimited',
+                 type=ValueType(name='int'),
+                 doc='are control limits defined (mjtLimited)',
+             ),
+             StructFieldDecl(
+                 name='ctrlrange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='control range',
+             ),
+             StructFieldDecl(
+                 name='forcelimited',
+                 type=ValueType(name='int'),
+                 doc='are force limits defined (mjtLimited)',
+             ),
+             StructFieldDecl(
+                 name='forcerange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='force range',
+             ),
+             StructFieldDecl(
+                 name='actlimited',
+                 type=ValueType(name='int'),
+                 doc='are activation limits defined (mjtLimited)',
+             ),
+             StructFieldDecl(
+                 name='actrange',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='activation range',
+             ),
+             StructFieldDecl(
+                 name='group',
+                 type=ValueType(name='int'),
+                 doc='group',
+             ),
+             StructFieldDecl(
+                 name='nsample',
+                 type=ValueType(name='int'),
+                 doc='number of samples in history buffer',
+             ),
+             StructFieldDecl(
+                 name='interp',
+                 type=ValueType(name='int'),
+                 doc='interpolation order (0=ZOH, 1=linear, 2=cubic)',
+             ),
+             StructFieldDecl(
+                 name='delay',
+                 type=ValueType(name='double'),
+                 doc='delay time in seconds; 0: no delay',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='plugin',
+                 type=ValueType(name='mjsPlugin'),
+                 doc='actuator plugin',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsSensor',
+     StructDecl(
+         name='mjsSensor',
+         declname='struct mjsSensor_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtSensor'),
+                 doc='type of sensor',
+             ),
+             StructFieldDecl(
+                 name='objtype',
+                 type=ValueType(name='mjtObj'),
+                 doc='type of sensorized object',
+             ),
+             StructFieldDecl(
+                 name='objname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of sensorized object',
+             ),
+             StructFieldDecl(
+                 name='reftype',
+                 type=ValueType(name='mjtObj'),
+                 doc='type of referenced object',
+             ),
+             StructFieldDecl(
+                 name='refname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='name of referenced object',
+             ),
+             StructFieldDecl(
+                 name='intprm',
+                 type=ArrayType(
+                     inner_type=ValueType(name='int'),
+                     extents=(3,),
+                 ),
+                 doc='integer parameters',
+             ),
+             StructFieldDecl(
+                 name='datatype',
+                 type=ValueType(name='mjtDataType'),
+                 doc='data type for sensor measurement',
+             ),
+             StructFieldDecl(
+                 name='needstage',
+                 type=ValueType(name='mjtStage'),
+                 doc='compute stage needed to simulate sensor',
+             ),
+             StructFieldDecl(
+                 name='dim',
+                 type=ValueType(name='int'),
+                 doc='number of scalar outputs',
+             ),
+             StructFieldDecl(
+                 name='cutoff',
+                 type=ValueType(name='double'),
+                 doc='cutoff for real and positive datatypes',
+             ),
+             StructFieldDecl(
+                 name='noise',
+                 type=ValueType(name='double'),
+                 doc='noise stdev',
+             ),
+             StructFieldDecl(
+                 name='nsample',
+                 type=ValueType(name='int'),
+                 doc='number of samples in history buffer',
+             ),
+             StructFieldDecl(
+                 name='interp',
+                 type=ValueType(name='int'),
+                 doc='interpolation order (0=ZOH, 1=linear, 2=cubic)',
+             ),
+             StructFieldDecl(
+                 name='delay',
+                 type=ValueType(name='double'),
+                 doc='delay time in seconds',
+             ),
+             StructFieldDecl(
+                 name='interval',
+                 type=ArrayType(
+                     inner_type=ValueType(name='double'),
+                     extents=(2,),
+                 ),
+                 doc='[period, time_prev] in seconds',
+             ),
+             StructFieldDecl(
+                 name='userdata',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='user data',
+             ),
+             StructFieldDecl(
+                 name='plugin',
+                 type=ValueType(name='mjsPlugin'),
+                 doc='sensor plugin',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsNumeric',
+     StructDecl(
+         name='mjsNumeric',
+         declname='struct mjsNumeric_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='data',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='initialization data',
+             ),
+             StructFieldDecl(
+                 name='size',
+                 type=ValueType(name='int'),
+                 doc='array size, can be bigger than data size',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsText',
+     StructDecl(
+         name='mjsText',
+         declname='struct mjsText_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='data',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='text string',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsTuple',
+     StructDecl(
+         name='mjsTuple',
+         declname='struct mjsTuple_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='objtype',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjIntVec'),
+                 ),
+                 doc='object types',
+             ),
+             StructFieldDecl(
+                 name='objname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjStringVec'),
+                 ),
+                 doc='object names',
+             ),
+             StructFieldDecl(
+                 name='objprm',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='object parameters',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsKey',
+     StructDecl(
+         name='mjsKey',
+         declname='struct mjsKey_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='time',
+                 type=ValueType(name='double'),
+                 doc='time',
+             ),
+             StructFieldDecl(
+                 name='qpos',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='qpos',
+             ),
+             StructFieldDecl(
+                 name='qvel',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='qvel',
+             ),
+             StructFieldDecl(
+                 name='act',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='act',
+             ),
+             StructFieldDecl(
+                 name='mpos',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='mocap pos',
+             ),
+             StructFieldDecl(
+                 name='mquat',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='mocap quat',
+             ),
+             StructFieldDecl(
+                 name='ctrl',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjDoubleVec'),
+                 ),
+                 doc='ctrl',
+             ),
+             StructFieldDecl(
+                 name='info',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='message appended to compiler errors',
+             ),
+         ),
+     )),
+    ('mjsDefault',
+     StructDecl(
+         name='mjsDefault',
+         declname='struct mjsDefault_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='joint',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsJoint'),
+                 ),
+                 doc='joint defaults',
+             ),
+             StructFieldDecl(
+                 name='geom',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsGeom'),
+                 ),
+                 doc='geom defaults',
+             ),
+             StructFieldDecl(
+                 name='site',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsSite'),
+                 ),
+                 doc='site defaults',
+             ),
+             StructFieldDecl(
+                 name='camera',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsCamera'),
+                 ),
+                 doc='camera defaults',
+             ),
+             StructFieldDecl(
+                 name='light',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsLight'),
+                 ),
+                 doc='light defaults',
+             ),
+             StructFieldDecl(
+                 name='flex',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsFlex'),
+                 ),
+                 doc='flex defaults',
+             ),
+             StructFieldDecl(
+                 name='mesh',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsMesh'),
+                 ),
+                 doc='mesh defaults',
+             ),
+             StructFieldDecl(
+                 name='material',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsMaterial'),
+                 ),
+                 doc='material defaults',
+             ),
+             StructFieldDecl(
+                 name='pair',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsPair'),
+                 ),
+                 doc='pair defaults',
+             ),
+             StructFieldDecl(
+                 name='equality',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsEquality'),
+                 ),
+                 doc='equality defaults',
+             ),
+             StructFieldDecl(
+                 name='tendon',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsTendon'),
+                 ),
+                 doc='tendon defaults',
+             ),
+             StructFieldDecl(
+                 name='actuator',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsActuator'),
+                 ),
+                 doc='actuator defaults',
              ),
          ),
      )),
@@ -6242,7 +9868,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              StructFieldDecl(
                  name='dataid',
                  type=ValueType(name='int'),
-                 doc='mesh, hfield or plane id; -1: none',
+                 doc='mesh, hfield or plane id; -1: none; mesh: 2*id or 2*id+1 (hull)',  # pylint: disable=line-too-long
              ),
              StructFieldDecl(
                  name='objtype',
@@ -6357,6 +9983,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
          declname='struct mjvLight_',
          fields=(
              StructFieldDecl(
+                 name='id',
+                 type=ValueType(name='int'),
+                 doc='light id, -1 for headlight',
+             ),
+             StructFieldDecl(
                  name='pos',
                  type=ArrayType(
                      inner_type=ValueType(name='float'),
@@ -6371,6 +10002,16 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      extents=(3,),
                  ),
                  doc='direction rel. to body frame',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='int'),
+                 doc='type (mjtLightType)',
+             ),
+             StructFieldDecl(
+                 name='texid',
+                 type=ValueType(name='int'),
+                 doc='texture id for image lights',
              ),
              StructFieldDecl(
                  name='attenuation',
@@ -6420,11 +10061,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='headlight',
              ),
              StructFieldDecl(
-                 name='directional',
-                 type=ValueType(name='mjtByte'),
-                 doc='directional light',
-             ),
-             StructFieldDecl(
                  name='castshadow',
                  type=ValueType(name='mjtByte'),
                  doc='does light cast shadows',
@@ -6433,6 +10069,16 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='bulbradius',
                  type=ValueType(name='float'),
                  doc='bulb radius for soft shadows',
+             ),
+             StructFieldDecl(
+                 name='intensity',
+                 type=ValueType(name='float'),
+                 doc='intensity, in candelas',
+             ),
+             StructFieldDecl(
+                 name='range',
+                 type=ValueType(name='float'),
+                 doc='range of effectiveness',
              ),
          ),
      )),
@@ -6511,7 +10157,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='flags',
                  type=ArrayType(
                      inner_type=ValueType(name='mjtByte'),
-                     extents=(32,),
+                     extents=(31,),
                  ),
                  doc='visualization flags (indexed by mjtVisFlag)',
              ),
@@ -6761,7 +10407,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='flags',
                  type=ArrayType(
                      inner_type=ValueType(name='mjtByte'),
-                     extents=(10,),
+                     extents=(11,),
                  ),
                  doc='rendering flags (indexed by mjtRndFlag)',
              ),
@@ -6777,6 +10423,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      extents=(3,),
                  ),
                  doc='frame color',
+             ),
+             StructFieldDecl(
+                 name='status',
+                 type=ValueType(name='int'),
+                 doc='status; 0: ok, 1: geoms exhausted',
              ),
          ),
      )),
@@ -6980,7 +10631,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='linedata',
                  type=ArrayType(
                      inner_type=ValueType(name='float'),
-                     extents=(100, 2000),
+                     extents=(100, 2002),
                  ),
                  doc='line data (x,y)',
              ),
@@ -7018,1625 +10669,50 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              ),
          ),
      )),
-    ('mjvSceneState',
+    ('mjSDF',
      StructDecl(
-         name='mjvSceneState',
-         declname='struct mjvSceneState_',
+         name='mjSDF',
+         declname='struct mjSDF_',
          fields=(
              StructFieldDecl(
-                 name='nbuffer',
-                 type=ValueType(name='int'),
-                 doc='size of the buffer in bytes',
-             ),
-             StructFieldDecl(
-                 name='buffer',
+                 name='plugin',
                  type=PointerType(
-                     inner_type=ValueType(name='void'),
-                 ),
-                 doc='heap-allocated memory for all arrays in this struct',
-             ),
-             StructFieldDecl(
-                 name='maxgeom',
-                 type=ValueType(name='int'),
-                 doc='maximum number of mjvGeom supported by this state object',
-             ),
-             StructFieldDecl(
-                 name='scratch',
-                 type=ValueType(name='mjvScene'),
-                 doc='scratch space for vis geoms inserted by the user and plugins',  # pylint: disable=line-too-long
-             ),
-             StructFieldDecl(
-                 name='model',
-                 type=AnonymousStructDecl(
-                     fields=(
-                         StructFieldDecl(
-                             name='nv',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nu',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='na',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nbody',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nbvh',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nbvhstatic',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='njnt',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ngeom',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nsite',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ncam',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nlight',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nmesh',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nskin',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nflex',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nflexvert',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nflextexcoord',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nskinvert',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nskinface',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nskinbone',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nskinbonevert',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nmat',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='neq',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ntendon',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ntree',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nwrap',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nsensor',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nnames',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='npaths',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nsensordata',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='narena',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='opt',
-                             type=ValueType(name='mjOption'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='vis',
-                             type=ValueType(name='mjVisual'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='stat',
-                             type=ValueType(name='mjStatistic'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_parentid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_rootid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_weldid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_mocapid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_jntnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_jntadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_dofnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_dofadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_geomnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_geomadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_iquat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_mass',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_inertia',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_bvhadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='body_bvhnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='bvh_depth',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='bvh_child',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='bvh_nodeid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='bvh_aabb',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='jnt_type',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='jnt_bodyid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='jnt_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_type',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_bodyid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_contype',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_conaffinity',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_dataid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_matid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_size',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_aabb',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_rbound',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_rgba',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_type',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_bodyid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_matid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_size',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_rgba',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_orthographic',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_fovy',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_ipd',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_resolution',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_sensorsize',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_intrinsic',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_directional',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_castshadow',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_bulbradius',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_active',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_attenuation',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_cutoff',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_exponent',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_ambient',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_diffuse',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_specular',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_flatskin',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_dim',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_matid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_interp',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_nodeadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_nodenum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_nodebodyid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_vertadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_vertnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_elem',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_elemtexcoord',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_elemlayer',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_elemadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_elemnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_elemdataadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_shell',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_shellnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_shelldataadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_texcoordadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_bvhadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_bvhnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_centered',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_node',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_radius',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_rgba',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flex_texcoord',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='hfield_pathadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mesh_bvhadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mesh_bvhnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mesh_texcoordadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mesh_graphadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mesh_pathadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_matid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_rgba',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_inflate',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_vertadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_vertnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_texcoordadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_faceadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_facenum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_boneadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonenum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_vert',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_face',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonevertadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonevertnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonebindpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonebindquat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonebodyid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonevertid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_bonevertweight',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='skin_pathadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tex_pathadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_texid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_texuniform',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_texrepeat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_emission',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_specular',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_shininess',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_reflectance',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_metallic',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_roughness',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='mat_rgba',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='eq_type',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='eq_obj1id',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='eq_obj2id',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='eq_objtype',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='eq_data',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_num',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_matid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_limited',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_width',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_range',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_stiffness',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_damping',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_frictionloss',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_lengthspring',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_rgba',
-                             type=PointerType(
-                                 inner_type=ValueType(name='float'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_trntype',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_dyntype',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_trnid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_actadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_actnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_group',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_ctrllimited',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_actlimited',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_ctrlrange',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_actrange',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='actuator_cranklength',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='sensor_type',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='sensor_objid',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='sensor_adr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_bodyadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_jntadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_geomadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_siteadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_camadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_lightadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_eqadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_tendonadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='name_actuatoradr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='names',
-                             type=PointerType(
-                                 inner_type=ValueType(name='char'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='paths',
-                             type=PointerType(
-                                 inner_type=ValueType(name='char'),
-                             ),
-                             doc='',
-                         ),
+                     inner_type=PointerType(
+                         inner_type=ValueType(name='mjpPlugin', is_const=True),
                      ),
                  ),
                  doc='',
              ),
              StructFieldDecl(
-                 name='data',
-                 type=AnonymousStructDecl(
-                     fields=(
-                         StructFieldDecl(
-                             name='warning',
-                             type=ArrayType(
-                                 inner_type=ValueType(name='mjWarningStat'),
-                                 extents=(8,),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nefc',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ncon',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='nisland',
-                             type=ValueType(name='int'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='time',
-                             type=ValueType(name='mjtNum'),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='act',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ctrl',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xfrc_applied',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='eq_active',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='sensordata',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xquat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xmat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xipos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ximat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xanchor',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='xaxis',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='geom_xmat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='site_xmat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='cam_xmat',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='light_xdir',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='subtree_com',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ten_wrapadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ten_wrapnum',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='wrap_obj',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='ten_length',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='wrap_xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='bvh_aabb_dyn',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='bvh_active',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtByte'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='island_dofadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='island_dofind',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='dof_island',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='efc_island',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='tendon_efcadr',
-                             type=PointerType(
-                                 inner_type=ValueType(name='int'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='flexvert_xpos',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='contact',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjContact'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='efc_force',
-                             type=PointerType(
-                                 inner_type=ValueType(name='mjtNum'),
-                             ),
-                             doc='',
-                         ),
-                         StructFieldDecl(
-                             name='arena',
-                             type=PointerType(
-                                 inner_type=ValueType(name='void'),
-                             ),
-                             doc='',
-                         ),
-                     ),
+                 name='id',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='',
+             ),
+             StructFieldDecl(
+                 name='type',
+                 type=ValueType(name='mjtSDFType'),
+                 doc='',
+             ),
+             StructFieldDecl(
+                 name='relpos',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='',
+             ),
+             StructFieldDecl(
+                 name='relmat',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtNum'),
+                 ),
+                 doc='',
+             ),
+             StructFieldDecl(
+                 name='geomtype',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjtGeom'),
                  ),
                  doc='',
              ),
@@ -8980,7 +11056,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='int'),
                      extents=(127,),
                  ),
-                 doc='chacarter widths: big',
+                 doc='character widths: big',
              ),
              StructFieldDecl(
                  name='charHeight',
@@ -9031,2955 +11107,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='readDepthMap',
                  type=ValueType(name='int'),
                  doc='depth mapping: mjDEPTH_ZERONEAR or mjDEPTH_ZEROFAR',
-             ),
-         ),
-     )),
-    ('mjsElement',
-     StructDecl(
-         name='mjsElement',
-         declname='struct mjsElement_',
-         fields=(
-             StructFieldDecl(
-                 name='elemtype',
-                 type=ValueType(name='mjtObj'),
-                 doc='element type',
-             ),
-         ),
-     )),
-    ('mjsCompiler',
-     StructDecl(
-         name='mjsCompiler',
-         declname='struct mjsCompiler_',
-         fields=(
-             StructFieldDecl(
-                 name='autolimits',
-                 type=ValueType(name='mjtByte'),
-                 doc='infer "limited" attribute based on range',
-             ),
-             StructFieldDecl(
-                 name='boundmass',
-                 type=ValueType(name='double'),
-                 doc='enforce minimum body mass',
-             ),
-             StructFieldDecl(
-                 name='boundinertia',
-                 type=ValueType(name='double'),
-                 doc='enforce minimum body diagonal inertia',
-             ),
-             StructFieldDecl(
-                 name='settotalmass',
-                 type=ValueType(name='double'),
-                 doc='rescale masses and inertias;<=0: ignore',
-             ),
-             StructFieldDecl(
-                 name='balanceinertia',
-                 type=ValueType(name='mjtByte'),
-                 doc='automatically impose A + B >= C rule',
-             ),
-             StructFieldDecl(
-                 name='fitaabb',
-                 type=ValueType(name='mjtByte'),
-                 doc='meshfit to aabb instead of inertia box',
-             ),
-             StructFieldDecl(
-                 name='degree',
-                 type=ValueType(name='mjtByte'),
-                 doc='angles in radians or degrees',
-             ),
-             StructFieldDecl(
-                 name='eulerseq',
-                 type=ArrayType(
-                     inner_type=ValueType(name='char'),
-                     extents=(3,),
-                 ),
-                 doc='sequence for euler rotations',
-             ),
-             StructFieldDecl(
-                 name='discardvisual',
-                 type=ValueType(name='mjtByte'),
-                 doc='discard visual geoms in parser',
-             ),
-             StructFieldDecl(
-                 name='usethread',
-                 type=ValueType(name='mjtByte'),
-                 doc='use multiple threads to speed up compiler',
-             ),
-             StructFieldDecl(
-                 name='fusestatic',
-                 type=ValueType(name='mjtByte'),
-                 doc='fuse static bodies with parent',
-             ),
-             StructFieldDecl(
-                 name='inertiafromgeom',
-                 type=ValueType(name='int'),
-                 doc='use geom inertias (mjtInertiaFromGeom)',
-             ),
-             StructFieldDecl(
-                 name='inertiagrouprange',
-                 type=ArrayType(
-                     inner_type=ValueType(name='int'),
-                     extents=(2,),
-                 ),
-                 doc='range of geom groups used to compute inertia',
-             ),
-             StructFieldDecl(
-                 name='alignfree',
-                 type=ValueType(name='int'),
-                 doc='align free joints with inertial frame',
-             ),
-             StructFieldDecl(
-                 name='LRopt',
-                 type=ValueType(name='mjLROpt'),
-                 doc='options for lengthrange computation',
-             ),
-         ),
-     )),
-    ('mjSpec',
-     StructDecl(
-         name='mjSpec',
-         declname='struct mjSpec_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='modelname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='model name',
-             ),
-             StructFieldDecl(
-                 name='compiler',
-                 type=ValueType(name='mjsCompiler'),
-                 doc='compiler options',
-             ),
-             StructFieldDecl(
-                 name='strippath',
-                 type=ValueType(name='mjtByte'),
-                 doc='automatically strip paths from mesh files',
-             ),
-             StructFieldDecl(
-                 name='meshdir',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='mesh and hfield directory',
-             ),
-             StructFieldDecl(
-                 name='texturedir',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='texture directory',
-             ),
-             StructFieldDecl(
-                 name='option',
-                 type=ValueType(name='mjOption'),
-                 doc='physics options',
-             ),
-             StructFieldDecl(
-                 name='visual',
-                 type=ValueType(name='mjVisual'),
-                 doc='visual options',
-             ),
-             StructFieldDecl(
-                 name='stat',
-                 type=ValueType(name='mjStatistic'),
-                 doc='statistics override (if defined)',
-             ),
-             StructFieldDecl(
-                 name='memory',
-                 type=ValueType(name='size_t'),
-                 doc='number of bytes in arena+stack memory',
-             ),
-             StructFieldDecl(
-                 name='nemax',
-                 type=ValueType(name='int'),
-                 doc='max number of equality constraints',
-             ),
-             StructFieldDecl(
-                 name='nuserdata',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in userdata',
-             ),
-             StructFieldDecl(
-                 name='nuser_body',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in body_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_jnt',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in jnt_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_geom',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in geom_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_site',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in site_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_cam',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in cam_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_tendon',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in tendon_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_actuator',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in actuator_user',
-             ),
-             StructFieldDecl(
-                 name='nuser_sensor',
-                 type=ValueType(name='int'),
-                 doc='number of mjtNums in sensor_user',
-             ),
-             StructFieldDecl(
-                 name='nkey',
-                 type=ValueType(name='int'),
-                 doc='number of keyframes',
-             ),
-             StructFieldDecl(
-                 name='njmax',
-                 type=ValueType(name='int'),
-                 doc='(deprecated) max number of constraints',
-             ),
-             StructFieldDecl(
-                 name='nconmax',
-                 type=ValueType(name='int'),
-                 doc='(deprecated) max number of detected contacts',
-             ),
-             StructFieldDecl(
-                 name='nstack',
-                 type=ValueType(name='size_t'),
-                 doc='(deprecated) number of mjtNums in mjData stack',
-             ),
-             StructFieldDecl(
-                 name='comment',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='comment at top of XML',
-             ),
-             StructFieldDecl(
-                 name='modelfiledir',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='path to model file',
-             ),
-             StructFieldDecl(
-                 name='hasImplicitPluginElem',
-                 type=ValueType(name='mjtByte'),
-                 doc='already encountered an implicit plugin sensor/actuator',
-             ),
-         ),
-     )),
-    ('mjsOrientation',
-     StructDecl(
-         name='mjsOrientation',
-         declname='struct mjsOrientation_',
-         fields=(
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtOrientation'),
-                 doc='active orientation specifier',
-             ),
-             StructFieldDecl(
-                 name='axisangle',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='axis and angle',
-             ),
-             StructFieldDecl(
-                 name='xyaxes',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(6,),
-                 ),
-                 doc='x and y axes',
-             ),
-             StructFieldDecl(
-                 name='zaxis',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='z axis (minimal rotation)',
-             ),
-             StructFieldDecl(
-                 name='euler',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='Euler angles',
-             ),
-         ),
-     )),
-    ('mjsPlugin',
-     StructDecl(
-         name='mjsPlugin',
-         declname='struct mjsPlugin_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='instance name',
-             ),
-             StructFieldDecl(
-                 name='plugin_name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='plugin name',
-             ),
-             StructFieldDecl(
-                 name='active',
-                 type=ValueType(name='mjtByte'),
-                 doc='is the plugin active',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsBody',
-     StructDecl(
-         name='mjsBody',
-         declname='struct mjsBody_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='childclass',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='childclass name',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='frame position',
-             ),
-             StructFieldDecl(
-                 name='quat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='frame orientation',
-             ),
-             StructFieldDecl(
-                 name='alt',
-                 type=ValueType(name='mjsOrientation'),
-                 doc='frame alternative orientation',
-             ),
-             StructFieldDecl(
-                 name='mass',
-                 type=ValueType(name='double'),
-                 doc='mass',
-             ),
-             StructFieldDecl(
-                 name='ipos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='inertial frame position',
-             ),
-             StructFieldDecl(
-                 name='iquat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='inertial frame orientation',
-             ),
-             StructFieldDecl(
-                 name='inertia',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='diagonal inertia (in i-frame)',
-             ),
-             StructFieldDecl(
-                 name='ialt',
-                 type=ValueType(name='mjsOrientation'),
-                 doc='inertial frame alternative orientation',
-             ),
-             StructFieldDecl(
-                 name='fullinertia',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(6,),
-                 ),
-                 doc='non-axis-aligned inertia matrix',
-             ),
-             StructFieldDecl(
-                 name='mocap',
-                 type=ValueType(name='mjtByte'),
-                 doc='is this a mocap body',
-             ),
-             StructFieldDecl(
-                 name='gravcomp',
-                 type=ValueType(name='double'),
-                 doc='gravity compensation',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='explicitinertial',
-                 type=ValueType(name='mjtByte'),
-                 doc='whether to save the body with explicit inertial clause',
-             ),
-             StructFieldDecl(
-                 name='plugin',
-                 type=ValueType(name='mjsPlugin'),
-                 doc='passive force plugin',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsFrame',
-     StructDecl(
-         name='mjsFrame',
-         declname='struct mjsFrame_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='childclass',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='childclass name',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='position',
-             ),
-             StructFieldDecl(
-                 name='quat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='orientation',
-             ),
-             StructFieldDecl(
-                 name='alt',
-                 type=ValueType(name='mjsOrientation'),
-                 doc='alternative orientation',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsJoint',
-     StructDecl(
-         name='mjsJoint',
-         declname='struct mjsJoint_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtJoint'),
-                 doc='joint type',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='anchor position',
-             ),
-             StructFieldDecl(
-                 name='axis',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='joint axis',
-             ),
-             StructFieldDecl(
-                 name='ref',
-                 type=ValueType(name='double'),
-                 doc='value at reference configuration: qpos0',
-             ),
-             StructFieldDecl(
-                 name='align',
-                 type=ValueType(name='int'),
-                 doc='align free joint with body com (mjtAlignFree)',
-             ),
-             StructFieldDecl(
-                 name='stiffness',
-                 type=ValueType(name='double'),
-                 doc='stiffness coefficient',
-             ),
-             StructFieldDecl(
-                 name='springref',
-                 type=ValueType(name='double'),
-                 doc='spring reference value: qpos_spring',
-             ),
-             StructFieldDecl(
-                 name='springdamper',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='timeconst, dampratio',
-             ),
-             StructFieldDecl(
-                 name='limited',
-                 type=ValueType(name='int'),
-                 doc='does joint have limits (mjtLimited)',
-             ),
-             StructFieldDecl(
-                 name='range',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='joint limits',
-             ),
-             StructFieldDecl(
-                 name='margin',
-                 type=ValueType(name='double'),
-                 doc='margin value for joint limit detection',
-             ),
-             StructFieldDecl(
-                 name='solref_limit',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference: joint limits',
-             ),
-             StructFieldDecl(
-                 name='solimp_limit',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance: joint limits',
-             ),
-             StructFieldDecl(
-                 name='actfrclimited',
-                 type=ValueType(name='int'),
-                 doc='are actuator forces on joint limited (mjtLimited)',
-             ),
-             StructFieldDecl(
-                 name='actfrcrange',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='actuator force limits',
-             ),
-             StructFieldDecl(
-                 name='armature',
-                 type=ValueType(name='double'),
-                 doc='armature inertia (mass for slider)',
-             ),
-             StructFieldDecl(
-                 name='damping',
-                 type=ValueType(name='double'),
-                 doc='damping coefficient',
-             ),
-             StructFieldDecl(
-                 name='frictionloss',
-                 type=ValueType(name='double'),
-                 doc='friction loss',
-             ),
-             StructFieldDecl(
-                 name='solref_friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference: dof friction',
-             ),
-             StructFieldDecl(
-                 name='solimp_friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance: dof friction',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group',
-             ),
-             StructFieldDecl(
-                 name='actgravcomp',
-                 type=ValueType(name='mjtByte'),
-                 doc='is gravcomp force applied via actuators',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsGeom',
-     StructDecl(
-         name='mjsGeom',
-         declname='struct mjsGeom_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtGeom'),
-                 doc='geom type',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='position',
-             ),
-             StructFieldDecl(
-                 name='quat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='orientation',
-             ),
-             StructFieldDecl(
-                 name='alt',
-                 type=ValueType(name='mjsOrientation'),
-                 doc='alternative orientation',
-             ),
-             StructFieldDecl(
-                 name='fromto',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(6,),
-                 ),
-                 doc='alternative for capsule, cylinder, box, ellipsoid',
-             ),
-             StructFieldDecl(
-                 name='size',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='type-specific size',
-             ),
-             StructFieldDecl(
-                 name='contype',
-                 type=ValueType(name='int'),
-                 doc='contact type',
-             ),
-             StructFieldDecl(
-                 name='conaffinity',
-                 type=ValueType(name='int'),
-                 doc='contact affinity',
-             ),
-             StructFieldDecl(
-                 name='condim',
-                 type=ValueType(name='int'),
-                 doc='contact dimensionality',
-             ),
-             StructFieldDecl(
-                 name='priority',
-                 type=ValueType(name='int'),
-                 doc='contact priority',
-             ),
-             StructFieldDecl(
-                 name='friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='one-sided friction coefficients: slide, roll, spin',
-             ),
-             StructFieldDecl(
-                 name='solmix',
-                 type=ValueType(name='double'),
-                 doc='solver mixing for contact pairs',
-             ),
-             StructFieldDecl(
-                 name='solref',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference',
-             ),
-             StructFieldDecl(
-                 name='solimp',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance',
-             ),
-             StructFieldDecl(
-                 name='margin',
-                 type=ValueType(name='double'),
-                 doc='margin for contact detection',
-             ),
-             StructFieldDecl(
-                 name='gap',
-                 type=ValueType(name='double'),
-                 doc='include in solver if dist<margin-gap',
-             ),
-             StructFieldDecl(
-                 name='mass',
-                 type=ValueType(name='double'),
-                 doc='used to compute density',
-             ),
-             StructFieldDecl(
-                 name='density',
-                 type=ValueType(name='double'),
-                 doc='used to compute mass and inertia from volume or surface',
-             ),
-             StructFieldDecl(
-                 name='typeinertia',
-                 type=ValueType(name='mjtGeomInertia'),
-                 doc='selects between surface and volume inertia',
-             ),
-             StructFieldDecl(
-                 name='fluid_ellipsoid',
-                 type=ValueType(name='mjtNum'),
-                 doc='whether ellipsoid-fluid model is active',
-             ),
-             StructFieldDecl(
-                 name='fluid_coefs',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='ellipsoid-fluid interaction coefs',
-             ),
-             StructFieldDecl(
-                 name='material',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of material',
-             ),
-             StructFieldDecl(
-                 name='rgba',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='rgba when material is omitted',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group',
-             ),
-             StructFieldDecl(
-                 name='hfieldname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='heightfield attached to geom',
-             ),
-             StructFieldDecl(
-                 name='meshname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='mesh attached to geom',
-             ),
-             StructFieldDecl(
-                 name='fitscale',
-                 type=ValueType(name='double'),
-                 doc='scale mesh uniformly',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='plugin',
-                 type=ValueType(name='mjsPlugin'),
-                 doc='sdf plugin',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsSite',
-     StructDecl(
-         name='mjsSite',
-         declname='struct mjsSite_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='position',
-             ),
-             StructFieldDecl(
-                 name='quat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='orientation',
-             ),
-             StructFieldDecl(
-                 name='alt',
-                 type=ValueType(name='mjsOrientation'),
-                 doc='alternative orientation',
-             ),
-             StructFieldDecl(
-                 name='fromto',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(6,),
-                 ),
-                 doc='alternative for capsule, cylinder, box, ellipsoid',
-             ),
-             StructFieldDecl(
-                 name='size',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='geom size',
-             ),
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtGeom'),
-                 doc='geom type',
-             ),
-             StructFieldDecl(
-                 name='material',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of material',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group',
-             ),
-             StructFieldDecl(
-                 name='rgba',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='rgba when material is omitted',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsCamera',
-     StructDecl(
-         name='mjsCamera',
-         declname='struct mjsCamera_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='position',
-             ),
-             StructFieldDecl(
-                 name='quat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='orientation',
-             ),
-             StructFieldDecl(
-                 name='alt',
-                 type=ValueType(name='mjsOrientation'),
-                 doc='alternative orientation',
-             ),
-             StructFieldDecl(
-                 name='mode',
-                 type=ValueType(name='mjtCamLight'),
-                 doc='tracking mode',
-             ),
-             StructFieldDecl(
-                 name='targetbody',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='target body for tracking/targeting',
-             ),
-             StructFieldDecl(
-                 name='orthographic',
-                 type=ValueType(name='int'),
-                 doc='is camera orthographic',
-             ),
-             StructFieldDecl(
-                 name='fovy',
-                 type=ValueType(name='double'),
-                 doc='y-field of view',
-             ),
-             StructFieldDecl(
-                 name='ipd',
-                 type=ValueType(name='double'),
-                 doc='inter-pupilary distance',
-             ),
-             StructFieldDecl(
-                 name='intrinsic',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='camera intrinsics (length)',
-             ),
-             StructFieldDecl(
-                 name='sensor_size',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='sensor size (length)',
-             ),
-             StructFieldDecl(
-                 name='resolution',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='resolution (pixel)',
-             ),
-             StructFieldDecl(
-                 name='focal_length',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='focal length (length)',
-             ),
-             StructFieldDecl(
-                 name='focal_pixel',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='focal length (pixel)',
-             ),
-             StructFieldDecl(
-                 name='principal_length',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='principal point (length)',
-             ),
-             StructFieldDecl(
-                 name='principal_pixel',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='principal point (pixel)',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsLight',
-     StructDecl(
-         name='mjsLight',
-         declname='struct mjsLight_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='pos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='position',
-             ),
-             StructFieldDecl(
-                 name='dir',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='direction',
-             ),
-             StructFieldDecl(
-                 name='mode',
-                 type=ValueType(name='mjtCamLight'),
-                 doc='tracking mode',
-             ),
-             StructFieldDecl(
-                 name='targetbody',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='target body for targeting',
-             ),
-             StructFieldDecl(
-                 name='active',
-                 type=ValueType(name='mjtByte'),
-                 doc='is light active',
-             ),
-             StructFieldDecl(
-                 name='directional',
-                 type=ValueType(name='mjtByte'),
-                 doc='is light directional or spot',
-             ),
-             StructFieldDecl(
-                 name='castshadow',
-                 type=ValueType(name='mjtByte'),
-                 doc='does light cast shadows',
-             ),
-             StructFieldDecl(
-                 name='bulbradius',
-                 type=ValueType(name='double'),
-                 doc='bulb radius, for soft shadows',
-             ),
-             StructFieldDecl(
-                 name='attenuation',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(3,),
-                 ),
-                 doc='OpenGL attenuation (quadratic model)',
-             ),
-             StructFieldDecl(
-                 name='cutoff',
-                 type=ValueType(name='float'),
-                 doc='OpenGL cutoff',
-             ),
-             StructFieldDecl(
-                 name='exponent',
-                 type=ValueType(name='float'),
-                 doc='OpenGL exponent',
-             ),
-             StructFieldDecl(
-                 name='ambient',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(3,),
-                 ),
-                 doc='ambient color',
-             ),
-             StructFieldDecl(
-                 name='diffuse',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(3,),
-                 ),
-                 doc='diffuse color',
-             ),
-             StructFieldDecl(
-                 name='specular',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(3,),
-                 ),
-                 doc='specular color',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errorsx',
-             ),
-         ),
-     )),
-    ('mjsFlex',
-     StructDecl(
-         name='mjsFlex',
-         declname='struct mjsFlex_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='contype',
-                 type=ValueType(name='int'),
-                 doc='contact type',
-             ),
-             StructFieldDecl(
-                 name='conaffinity',
-                 type=ValueType(name='int'),
-                 doc='contact affinity',
-             ),
-             StructFieldDecl(
-                 name='condim',
-                 type=ValueType(name='int'),
-                 doc='contact dimensionality',
-             ),
-             StructFieldDecl(
-                 name='priority',
-                 type=ValueType(name='int'),
-                 doc='contact priority',
-             ),
-             StructFieldDecl(
-                 name='friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='one-sided friction coefficients: slide, roll, spin',
-             ),
-             StructFieldDecl(
-                 name='solmix',
-                 type=ValueType(name='double'),
-                 doc='solver mixing for contact pairs',
-             ),
-             StructFieldDecl(
-                 name='solref',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference',
-             ),
-             StructFieldDecl(
-                 name='solimp',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance',
-             ),
-             StructFieldDecl(
-                 name='margin',
-                 type=ValueType(name='double'),
-                 doc='margin for contact detection',
-             ),
-             StructFieldDecl(
-                 name='gap',
-                 type=ValueType(name='double'),
-                 doc='include in solver if dist<margin-gap',
-             ),
-             StructFieldDecl(
-                 name='dim',
-                 type=ValueType(name='int'),
-                 doc='element dimensionality',
-             ),
-             StructFieldDecl(
-                 name='radius',
-                 type=ValueType(name='double'),
-                 doc='radius around primitive element',
-             ),
-             StructFieldDecl(
-                 name='internal',
-                 type=ValueType(name='mjtByte'),
-                 doc='enable internal collisions',
-             ),
-             StructFieldDecl(
-                 name='flatskin',
-                 type=ValueType(name='mjtByte'),
-                 doc='render flex skin with flat shading',
-             ),
-             StructFieldDecl(
-                 name='selfcollide',
-                 type=ValueType(name='int'),
-                 doc='mode for flex self colllision',
-             ),
-             StructFieldDecl(
-                 name='activelayers',
-                 type=ValueType(name='int'),
-                 doc='number of active element layers in 3D',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group for visualizatioh',
-             ),
-             StructFieldDecl(
-                 name='edgestiffness',
-                 type=ValueType(name='double'),
-                 doc='edge stiffness',
-             ),
-             StructFieldDecl(
-                 name='edgedamping',
-                 type=ValueType(name='double'),
-                 doc='edge damping',
-             ),
-             StructFieldDecl(
-                 name='rgba',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='rgba when material is omitted',
-             ),
-             StructFieldDecl(
-                 name='material',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of material used for rendering',
-             ),
-             StructFieldDecl(
-                 name='young',
-                 type=ValueType(name='double'),
-                 doc="Young's modulus",
-             ),
-             StructFieldDecl(
-                 name='poisson',
-                 type=ValueType(name='double'),
-                 doc="Poisson's ratio",
-             ),
-             StructFieldDecl(
-                 name='damping',
-                 type=ValueType(name='double'),
-                 doc="Rayleigh's damping",
-             ),
-             StructFieldDecl(
-                 name='thickness',
-                 type=ValueType(name='double'),
-                 doc='thickness (2D only)',
-             ),
-             StructFieldDecl(
-                 name='nodebody',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjStringVec'),
-                 ),
-                 doc='node body names',
-             ),
-             StructFieldDecl(
-                 name='vertbody',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjStringVec'),
-                 ),
-                 doc='vertex body names',
-             ),
-             StructFieldDecl(
-                 name='node',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='node positions',
-             ),
-             StructFieldDecl(
-                 name='vert',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='vertex positions',
-             ),
-             StructFieldDecl(
-                 name='elem',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVec'),
-                 ),
-                 doc='element vertex ids',
-             ),
-             StructFieldDecl(
-                 name='texcoord',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='vertex texture coordinates',
-             ),
-             StructFieldDecl(
-                 name='elemtexcoord',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVec'),
-                 ),
-                 doc='element texture coordinates',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsMesh',
-     StructDecl(
-         name='mjsMesh',
-         declname='struct mjsMesh_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='content_type',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='content type of file',
-             ),
-             StructFieldDecl(
-                 name='file',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='mesh file',
-             ),
-             StructFieldDecl(
-                 name='refpos',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='reference position',
-             ),
-             StructFieldDecl(
-                 name='refquat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='reference orientation',
-             ),
-             StructFieldDecl(
-                 name='scale',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='rescale mesh',
-             ),
-             StructFieldDecl(
-                 name='inertia',
-                 type=ValueType(name='mjtMeshInertia'),
-                 doc='inertia type (convex, legacy, exact, shell)',
-             ),
-             StructFieldDecl(
-                 name='smoothnormal',
-                 type=ValueType(name='mjtByte'),
-                 doc='do not exclude large-angle faces from normals',
-             ),
-             StructFieldDecl(
-                 name='maxhullvert',
-                 type=ValueType(name='int'),
-                 doc='maximum vertex count for the convex hull',
-             ),
-             StructFieldDecl(
-                 name='uservert',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='user vertex data',
-             ),
-             StructFieldDecl(
-                 name='usernormal',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='user normal data',
-             ),
-             StructFieldDecl(
-                 name='usertexcoord',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='user texcoord data',
-             ),
-             StructFieldDecl(
-                 name='userface',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVec'),
-                 ),
-                 doc='user vertex indices',
-             ),
-             StructFieldDecl(
-                 name='userfacetexcoord',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVec'),
-                 ),
-                 doc='user texcoord indices',
-             ),
-             StructFieldDecl(
-                 name='plugin',
-                 type=ValueType(name='mjsPlugin'),
-                 doc='sdf plugin',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsHField',
-     StructDecl(
-         name='mjsHField',
-         declname='struct mjsHField_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='content_type',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='content type of file',
-             ),
-             StructFieldDecl(
-                 name='file',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='file: (nrow, ncol, [elevation data])',
-             ),
-             StructFieldDecl(
-                 name='size',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(4,),
-                 ),
-                 doc='hfield size (ignore referencing geom size)',
-             ),
-             StructFieldDecl(
-                 name='nrow',
-                 type=ValueType(name='int'),
-                 doc='number of rows',
-             ),
-             StructFieldDecl(
-                 name='ncol',
-                 type=ValueType(name='int'),
-                 doc='number of columns',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='user-provided elevation data',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsSkin',
-     StructDecl(
-         name='mjsSkin',
-         declname='struct mjsSkin_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='file',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='skin file',
-             ),
-             StructFieldDecl(
-                 name='material',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of material used for rendering',
-             ),
-             StructFieldDecl(
-                 name='rgba',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='rgba when material is omitted',
-             ),
-             StructFieldDecl(
-                 name='inflate',
-                 type=ValueType(name='float'),
-                 doc='inflate in normal direction',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group for visualization',
-             ),
-             StructFieldDecl(
-                 name='vert',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='vertex positions',
-             ),
-             StructFieldDecl(
-                 name='texcoord',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='texture coordinates',
-             ),
-             StructFieldDecl(
-                 name='face',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVec'),
-                 ),
-                 doc='faces',
-             ),
-             StructFieldDecl(
-                 name='bodyname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjStringVec'),
-                 ),
-                 doc='body names',
-             ),
-             StructFieldDecl(
-                 name='bindpos',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='bind pos',
-             ),
-             StructFieldDecl(
-                 name='bindquat',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVec'),
-                 ),
-                 doc='bind quat',
-             ),
-             StructFieldDecl(
-                 name='vertid',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVecVec'),
-                 ),
-                 doc='vertex ids',
-             ),
-             StructFieldDecl(
-                 name='vertweight',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjFloatVecVec'),
-                 ),
-                 doc='vertex weights',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsTexture',
-     StructDecl(
-         name='mjsTexture',
-         declname='struct mjsTexture_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtTexture'),
-                 doc='texture type',
-             ),
-             StructFieldDecl(
-                 name='builtin',
-                 type=ValueType(name='int'),
-                 doc='builtin type (mjtBuiltin)',
-             ),
-             StructFieldDecl(
-                 name='mark',
-                 type=ValueType(name='int'),
-                 doc='mark type (mjtMark)',
-             ),
-             StructFieldDecl(
-                 name='rgb1',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='first color for builtin',
-             ),
-             StructFieldDecl(
-                 name='rgb2',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='second color for builtin',
-             ),
-             StructFieldDecl(
-                 name='markrgb',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(3,),
-                 ),
-                 doc='mark color',
-             ),
-             StructFieldDecl(
-                 name='random',
-                 type=ValueType(name='double'),
-                 doc='probability of random dots',
-             ),
-             StructFieldDecl(
-                 name='height',
-                 type=ValueType(name='int'),
-                 doc='height in pixels (square for cube and skybox)',
-             ),
-             StructFieldDecl(
-                 name='width',
-                 type=ValueType(name='int'),
-                 doc='width in pixels',
-             ),
-             StructFieldDecl(
-                 name='nchannel',
-                 type=ValueType(name='int'),
-                 doc='number of channels',
-             ),
-             StructFieldDecl(
-                 name='content_type',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='content type of file',
-             ),
-             StructFieldDecl(
-                 name='file',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='png file to load; use for all sides of cube',
-             ),
-             StructFieldDecl(
-                 name='gridsize',
-                 type=ArrayType(
-                     inner_type=ValueType(name='int'),
-                     extents=(2,),
-                 ),
-                 doc='size of grid for composite file; (1,1)-repeat',
-             ),
-             StructFieldDecl(
-                 name='gridlayout',
-                 type=ArrayType(
-                     inner_type=ValueType(name='char'),
-                     extents=(13,),
-                 ),
-                 doc='row-major: L,R,F,B,U,D for faces; . for unused',
-             ),
-             StructFieldDecl(
-                 name='cubefiles',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjStringVec'),
-                 ),
-                 doc='different file for each side of the cube',
-             ),
-             StructFieldDecl(
-                 name='data',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjByteVec'),
-                 ),
-                 doc='texture data',
-             ),
-             StructFieldDecl(
-                 name='hflip',
-                 type=ValueType(name='mjtByte'),
-                 doc='horizontal flip',
-             ),
-             StructFieldDecl(
-                 name='vflip',
-                 type=ValueType(name='mjtByte'),
-                 doc='vertical flip',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsMaterial',
-     StructDecl(
-         name='mjsMaterial',
-         declname='struct mjsMaterial_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='textures',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjStringVec'),
-                 ),
-                 doc='names of textures (empty: none)',
-             ),
-             StructFieldDecl(
-                 name='texuniform',
-                 type=ValueType(name='mjtByte'),
-                 doc='make texture cube uniform',
-             ),
-             StructFieldDecl(
-                 name='texrepeat',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(2,),
-                 ),
-                 doc='texture repetition for 2D mapping',
-             ),
-             StructFieldDecl(
-                 name='emission',
-                 type=ValueType(name='float'),
-                 doc='emission',
-             ),
-             StructFieldDecl(
-                 name='specular',
-                 type=ValueType(name='float'),
-                 doc='specular',
-             ),
-             StructFieldDecl(
-                 name='shininess',
-                 type=ValueType(name='float'),
-                 doc='shininess',
-             ),
-             StructFieldDecl(
-                 name='reflectance',
-                 type=ValueType(name='float'),
-                 doc='reflectance',
-             ),
-             StructFieldDecl(
-                 name='metallic',
-                 type=ValueType(name='float'),
-                 doc='metallic',
-             ),
-             StructFieldDecl(
-                 name='roughness',
-                 type=ValueType(name='float'),
-                 doc='roughness',
-             ),
-             StructFieldDecl(
-                 name='rgba',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='rgba',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsPair',
-     StructDecl(
-         name='mjsPair',
-         declname='struct mjsPair_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='geomname1',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of geom 1',
-             ),
-             StructFieldDecl(
-                 name='geomname2',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of geom 2',
-             ),
-             StructFieldDecl(
-                 name='condim',
-                 type=ValueType(name='int'),
-                 doc='contact dimensionality',
-             ),
-             StructFieldDecl(
-                 name='solref',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference, normal direction',
-             ),
-             StructFieldDecl(
-                 name='solreffriction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference, frictional directions',
-             ),
-             StructFieldDecl(
-                 name='solimp',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance',
-             ),
-             StructFieldDecl(
-                 name='margin',
-                 type=ValueType(name='double'),
-                 doc='margin for contact detection',
-             ),
-             StructFieldDecl(
-                 name='gap',
-                 type=ValueType(name='double'),
-                 doc='include in solver if dist<margin-gap',
-             ),
-             StructFieldDecl(
-                 name='friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(5,),
-                 ),
-                 doc='full contact friction',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to errors',
-             ),
-         ),
-     )),
-    ('mjsExclude',
-     StructDecl(
-         name='mjsExclude',
-         declname='struct mjsExclude_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='bodyname1',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of geom 1',
-             ),
-             StructFieldDecl(
-                 name='bodyname2',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of geom 2',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to errors',
-             ),
-         ),
-     )),
-    ('mjsEquality',
-     StructDecl(
-         name='mjsEquality',
-         declname='struct mjsEquality_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtEq'),
-                 doc='constraint type',
-             ),
-             StructFieldDecl(
-                 name='data',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(11,),
-                 ),
-                 doc='type-dependent data',
-             ),
-             StructFieldDecl(
-                 name='active',
-                 type=ValueType(name='mjtByte'),
-                 doc='is equality initially active',
-             ),
-             StructFieldDecl(
-                 name='name1',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of object 1',
-             ),
-             StructFieldDecl(
-                 name='name2',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of object 2',
-             ),
-             StructFieldDecl(
-                 name='objtype',
-                 type=ValueType(name='mjtObj'),
-                 doc='type of both objects',
-             ),
-             StructFieldDecl(
-                 name='solref',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference',
-             ),
-             StructFieldDecl(
-                 name='solimp',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to errors',
-             ),
-         ),
-     )),
-    ('mjsTendon',
-     StructDecl(
-         name='mjsTendon',
-         declname='struct mjsTendon_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='stiffness',
-                 type=ValueType(name='double'),
-                 doc='stiffness coefficient',
-             ),
-             StructFieldDecl(
-                 name='springlength',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='spring resting length; {-1, -1}: use qpos_spring',
-             ),
-             StructFieldDecl(
-                 name='damping',
-                 type=ValueType(name='double'),
-                 doc='damping coefficient',
-             ),
-             StructFieldDecl(
-                 name='frictionloss',
-                 type=ValueType(name='double'),
-                 doc='friction loss',
-             ),
-             StructFieldDecl(
-                 name='solref_friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference: tendon friction',
-             ),
-             StructFieldDecl(
-                 name='solimp_friction',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance: tendon friction',
-             ),
-             StructFieldDecl(
-                 name='limited',
-                 type=ValueType(name='int'),
-                 doc='does tendon have limits (mjtLimited)',
-             ),
-             StructFieldDecl(
-                 name='range',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='length limits',
-             ),
-             StructFieldDecl(
-                 name='margin',
-                 type=ValueType(name='double'),
-                 doc='margin value for tendon limit detection',
-             ),
-             StructFieldDecl(
-                 name='solref_limit',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(2,),
-                 ),
-                 doc='solver reference: tendon limits',
-             ),
-             StructFieldDecl(
-                 name='solimp_limit',
-                 type=ArrayType(
-                     inner_type=ValueType(name='mjtNum'),
-                     extents=(5,),
-                 ),
-                 doc='solver impedance: tendon limits',
-             ),
-             StructFieldDecl(
-                 name='material',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of material for rendering',
-             ),
-             StructFieldDecl(
-                 name='width',
-                 type=ValueType(name='double'),
-                 doc='width for rendering',
-             ),
-             StructFieldDecl(
-                 name='rgba',
-                 type=ArrayType(
-                     inner_type=ValueType(name='float'),
-                     extents=(4,),
-                 ),
-                 doc='rgba when material is omitted',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to errors',
-             ),
-         ),
-     )),
-    ('mjsWrap',
-     StructDecl(
-         name='mjsWrap',
-         declname='struct mjsWrap_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to errors',
-             ),
-         ),
-     )),
-    ('mjsActuator',
-     StructDecl(
-         name='mjsActuator',
-         declname='struct mjsActuator_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='gaintype',
-                 type=ValueType(name='mjtGain'),
-                 doc='gain type',
-             ),
-             StructFieldDecl(
-                 name='gainprm',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(10,),
-                 ),
-                 doc='gain parameters',
-             ),
-             StructFieldDecl(
-                 name='biastype',
-                 type=ValueType(name='mjtBias'),
-                 doc='bias type',
-             ),
-             StructFieldDecl(
-                 name='biasprm',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(10,),
-                 ),
-                 doc='bias parameters',
-             ),
-             StructFieldDecl(
-                 name='dyntype',
-                 type=ValueType(name='mjtDyn'),
-                 doc='dynamics type',
-             ),
-             StructFieldDecl(
-                 name='dynprm',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(10,),
-                 ),
-                 doc='dynamics parameters',
-             ),
-             StructFieldDecl(
-                 name='actdim',
-                 type=ValueType(name='int'),
-                 doc='number of activation variables',
-             ),
-             StructFieldDecl(
-                 name='actearly',
-                 type=ValueType(name='mjtByte'),
-                 doc='apply next activations to qfrc',
-             ),
-             StructFieldDecl(
-                 name='trntype',
-                 type=ValueType(name='mjtTrn'),
-                 doc='transmission type',
-             ),
-             StructFieldDecl(
-                 name='gear',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(6,),
-                 ),
-                 doc='length and transmitted force scaling',
-             ),
-             StructFieldDecl(
-                 name='target',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of transmission target',
-             ),
-             StructFieldDecl(
-                 name='refsite',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='reference site, for site transmission',
-             ),
-             StructFieldDecl(
-                 name='slidersite',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='site defining cylinder, for slider-crank',
-             ),
-             StructFieldDecl(
-                 name='cranklength',
-                 type=ValueType(name='double'),
-                 doc='crank length, for slider-crank',
-             ),
-             StructFieldDecl(
-                 name='lengthrange',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='transmission length range',
-             ),
-             StructFieldDecl(
-                 name='inheritrange',
-                 type=ValueType(name='double'),
-                 doc='automatic range setting for position and intvelocity',
-             ),
-             StructFieldDecl(
-                 name='ctrllimited',
-                 type=ValueType(name='int'),
-                 doc='are control limits defined (mjtLimited)',
-             ),
-             StructFieldDecl(
-                 name='ctrlrange',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='control range',
-             ),
-             StructFieldDecl(
-                 name='forcelimited',
-                 type=ValueType(name='int'),
-                 doc='are force limits defined (mjtLimited)',
-             ),
-             StructFieldDecl(
-                 name='forcerange',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='force range',
-             ),
-             StructFieldDecl(
-                 name='actlimited',
-                 type=ValueType(name='int'),
-                 doc='are activation limits defined (mjtLimited)',
-             ),
-             StructFieldDecl(
-                 name='actrange',
-                 type=ArrayType(
-                     inner_type=ValueType(name='double'),
-                     extents=(2,),
-                 ),
-                 doc='activation range',
-             ),
-             StructFieldDecl(
-                 name='group',
-                 type=ValueType(name='int'),
-                 doc='group',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='plugin',
-                 type=ValueType(name='mjsPlugin'),
-                 doc='actuator plugin',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsSensor',
-     StructDecl(
-         name='mjsSensor',
-         declname='struct mjsSensor_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='type',
-                 type=ValueType(name='mjtSensor'),
-                 doc='type of sensor',
-             ),
-             StructFieldDecl(
-                 name='objtype',
-                 type=ValueType(name='mjtObj'),
-                 doc='type of sensorized object',
-             ),
-             StructFieldDecl(
-                 name='objname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of sensorized object',
-             ),
-             StructFieldDecl(
-                 name='reftype',
-                 type=ValueType(name='mjtObj'),
-                 doc='type of referenced object',
-             ),
-             StructFieldDecl(
-                 name='refname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name of referenced object',
-             ),
-             StructFieldDecl(
-                 name='datatype',
-                 type=ValueType(name='mjtDataType'),
-                 doc='data type for sensor measurement',
-             ),
-             StructFieldDecl(
-                 name='needstage',
-                 type=ValueType(name='mjtStage'),
-                 doc='compute stage needed to simulate sensor',
-             ),
-             StructFieldDecl(
-                 name='dim',
-                 type=ValueType(name='int'),
-                 doc='number of scalar outputs',
-             ),
-             StructFieldDecl(
-                 name='cutoff',
-                 type=ValueType(name='double'),
-                 doc='cutoff for real and positive datatypes',
-             ),
-             StructFieldDecl(
-                 name='noise',
-                 type=ValueType(name='double'),
-                 doc='noise stdev',
-             ),
-             StructFieldDecl(
-                 name='userdata',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='user data',
-             ),
-             StructFieldDecl(
-                 name='plugin',
-                 type=ValueType(name='mjsPlugin'),
-                 doc='sensor plugin',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsNumeric',
-     StructDecl(
-         name='mjsNumeric',
-         declname='struct mjsNumeric_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='data',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='initialization data',
-             ),
-             StructFieldDecl(
-                 name='size',
-                 type=ValueType(name='int'),
-                 doc='array size, can be bigger than data size',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsText',
-     StructDecl(
-         name='mjsText',
-         declname='struct mjsText_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='data',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='text string',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsTuple',
-     StructDecl(
-         name='mjsTuple',
-         declname='struct mjsTuple_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='objtype',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjIntVec'),
-                 ),
-                 doc='object types',
-             ),
-             StructFieldDecl(
-                 name='objname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjStringVec'),
-                 ),
-                 doc='object names',
-             ),
-             StructFieldDecl(
-                 name='objprm',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='object parameters',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsKey',
-     StructDecl(
-         name='mjsKey',
-         declname='struct mjsKey_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='name',
-             ),
-             StructFieldDecl(
-                 name='time',
-                 type=ValueType(name='double'),
-                 doc='time',
-             ),
-             StructFieldDecl(
-                 name='qpos',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='qpos',
-             ),
-             StructFieldDecl(
-                 name='qvel',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='qvel',
-             ),
-             StructFieldDecl(
-                 name='act',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='act',
-             ),
-             StructFieldDecl(
-                 name='mpos',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='mocap pos',
-             ),
-             StructFieldDecl(
-                 name='mquat',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='mocap quat',
-             ),
-             StructFieldDecl(
-                 name='ctrl',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjDoubleVec'),
-                 ),
-                 doc='ctrl',
-             ),
-             StructFieldDecl(
-                 name='info',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='message appended to compiler errors',
-             ),
-         ),
-     )),
-    ('mjsDefault',
-     StructDecl(
-         name='mjsDefault',
-         declname='struct mjsDefault_',
-         fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='name',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='class name',
-             ),
-             StructFieldDecl(
-                 name='joint',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsJoint'),
-                 ),
-                 doc='joint defaults',
-             ),
-             StructFieldDecl(
-                 name='geom',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsGeom'),
-                 ),
-                 doc='geom defaults',
-             ),
-             StructFieldDecl(
-                 name='site',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsSite'),
-                 ),
-                 doc='site defaults',
-             ),
-             StructFieldDecl(
-                 name='camera',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsCamera'),
-                 ),
-                 doc='camera defaults',
-             ),
-             StructFieldDecl(
-                 name='light',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsLight'),
-                 ),
-                 doc='light defaults',
-             ),
-             StructFieldDecl(
-                 name='flex',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsFlex'),
-                 ),
-                 doc='flex defaults',
-             ),
-             StructFieldDecl(
-                 name='mesh',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsMesh'),
-                 ),
-                 doc='mesh defaults',
-             ),
-             StructFieldDecl(
-                 name='material',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsMaterial'),
-                 ),
-                 doc='material defaults',
-             ),
-             StructFieldDecl(
-                 name='pair',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsPair'),
-                 ),
-                 doc='pair defaults',
-             ),
-             StructFieldDecl(
-                 name='equality',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsEquality'),
-                 ),
-                 doc='equality defaults',
-             ),
-             StructFieldDecl(
-                 name='tendon',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsTendon'),
-                 ),
-                 doc='tendon defaults',
-             ),
-             StructFieldDecl(
-                 name='actuator',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsActuator'),
-                 ),
-                 doc='actuator defaults',
              ),
          ),
      )),

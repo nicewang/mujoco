@@ -15,15 +15,14 @@
 #include "engine/engine_derivative_fd.h"
 
 #include <stddef.h>
-#include <string.h>
 
 #include <mujoco/mjdata.h>
 #include <mujoco/mjmacro.h>
 #include <mujoco/mjmodel.h>
 #include <mujoco/mjsan.h>  // IWYU pragma: keep
 #include "engine/engine_forward.h"
-#include "engine/engine_io.h"
 #include "engine/engine_inverse.h"
+#include "engine/engine_memory.h"
 #include "engine/engine_macro.h"
 #include "engine/engine_support.h"
 #include "engine/engine_util_blas.h"
@@ -43,7 +42,6 @@ static void getState(const mjModel* m, const mjData* d, mjtNum* state, mjtNum* s
 }
 
 
-
 // dx = (x2 - x1) / h
 static void diff(mjtNum* restrict dx, const mjtNum* x1, const mjtNum* x2, mjtNum h, int n) {
   mjtNum inv_h = 1/h;
@@ -51,7 +49,6 @@ static void diff(mjtNum* restrict dx, const mjtNum* x1, const mjtNum* x2, mjtNum
     dx[i] = inv_h * (x2[i] - x1[i]);
   }
 }
-
 
 
 // finite-difference two state vectors ds = (s2 - s1) / h
@@ -65,7 +62,6 @@ static void stateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s1, const mjtN
     diff(ds+nv, s1+nq, s2+nq, h, nv+na);
   }
 }
-
 
 
 // finite-difference two vectors, forward, backward or centered
@@ -87,7 +83,6 @@ static void clampedDiff(mjtNum* dx, const mjtNum* x, const mjtNum* x_plus, const
 }
 
 
-
 // finite-difference two state vectors, forward, backward or centered
 static void clampedStateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s, const mjtNum* s_plus,
                              const mjtNum* s_minus, mjtNum h) {
@@ -107,13 +102,11 @@ static void clampedStateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s, cons
 }
 
 
-
 // check if two numbers are inside a given range
 static int inRange(const mjtNum x1, const mjtNum x2, const mjtNum* range) {
   return x1 >= range[0] && x1 <= range[1] &&
          x2 >= range[0] && x2 <= range[1];
 }
-
 
 
 // advance simulation using control callback, skipstage is mjtStage
@@ -155,7 +148,6 @@ void mj_stepSkip(const mjModel* m, mjData* d, int skipstage, int skipsensor) {
 }
 
 
-
 // compute qfrc_inverse, optionally subtracting qfrc_actuator
 static void inverseSkip(const mjModel* m, mjData* d, mjtStage stage, int skipsensor,
                         int flg_actuation, mjtNum* force) {
@@ -166,7 +158,6 @@ static void inverseSkip(const mjModel* m, mjData* d, mjtStage stage, int skipsen
     mju_subFrom(force, d->qfrc_actuator, m->nv);
   }
 }
-
 
 
 //------------------------- derivatives of passive forces ------------------------------------------
@@ -204,8 +195,8 @@ void mjd_passive_velFD(const mjModel* m, mjData* d, mjtNum eps) {
 
     // copy to i-th column of qDeriv
     for (int j=0; j < nv; j++) {
-      int adr = d->D_rowadr[j] + cnt[j];
-      if (cnt[j] < d->D_rownnz[j] && d->D_colind[adr] == i) {
+      int adr = m->D_rowadr[j] + cnt[j];
+      if (cnt[j] < m->D_rownnz[j] && m->D_colind[adr] == i) {
         d->qDeriv[adr] = fd[j];
         cnt[j]++;
       }
@@ -217,7 +208,6 @@ void mjd_passive_velFD(const mjModel* m, mjData* d, mjtNum eps) {
 
   mj_freeStack(d);
 }
-
 
 
 //-------------------- derivatives of all smooth (unconstrained) forces ----------------------------
@@ -263,8 +253,8 @@ void mjd_smooth_velFD(const mjModel* m, mjData* d, mjtNum eps) {
 
     // copy to sparse qDeriv
     for (int j=0; j < nv; j++) {
-      if (cnt[j] < d->D_rownnz[j] && d->D_colind[d->D_rowadr[j]+cnt[j]] == i) {
-        d->qDeriv[d->D_rowadr[j]+cnt[j]] = fd[j];
+      if (cnt[j] < m->D_rownnz[j] && m->D_colind[m->D_rowadr[j]+cnt[j]] == i) {
+        d->qDeriv[m->D_rowadr[j]+cnt[j]] = fd[j];
         cnt[j]++;
       }
     }
@@ -272,7 +262,7 @@ void mjd_smooth_velFD(const mjModel* m, mjData* d, mjtNum eps) {
 
   // make sure final row counters equal rownnz
   for (int i=0; i < nv; i++) {
-    if (cnt[i] != d->D_rownnz[i]) {
+    if (cnt[i] != m->D_rownnz[i]) {
       mjERROR("error in constructing FD sparse derivative");
     }
   }
@@ -283,7 +273,6 @@ void mjd_smooth_velFD(const mjModel* m, mjData* d, mjtNum eps) {
 
   mj_freeStack(d);
 }
-
 
 
 //------------------------- main entry points ------------------------------------------------------
@@ -306,6 +295,10 @@ void mjd_smooth_velFD(const mjModel* m, mjData* d, mjtNum eps) {
 void mjd_stepFD(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
                 mjtNum* DyDq, mjtNum* DyDv, mjtNum* DyDa, mjtNum* DyDu,
                 mjtNum* DsDq, mjtNum* DsDv, mjtNum* DsDa, mjtNum* DsDu) {
+  if (m->nhistory) {
+    mjERROR("delays are not supported");
+  }
+
   int nq = m->nq, nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
   int ndx = 2*nv+na;  // row length of Dy Jacobians
   mj_markStack(d);
@@ -538,7 +531,6 @@ void mjd_stepFD(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
 }
 
 
-
 // finite differenced transition matrices (control theory notation)
 //   d(x_next) = A*dx + B*du
 //   d(sensor) = C*dx + D*du
@@ -551,6 +543,9 @@ void mjd_transitionFD(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cente
                       mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D) {
   if (m->opt.integrator == mjINT_RK4) {
     mjERROR("RK4 integrator is not supported");
+  }
+  if (m->nhistory) {
+    mjERROR("delays are not supported");
   }
 
   int nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;

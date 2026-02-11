@@ -115,6 +115,20 @@ TEST_F(SaveLastXmlTest, EmptyModel) {
   mj_deleteModel(model);
 }
 
+TEST_F(LoadXmlTest, NullFileFails) {
+  std::array<char, 1000> error;
+  mjSpec* spec = mj_parseXML(nullptr, nullptr, error.data(), error.size());
+  EXPECT_THAT(spec, IsNull()) << "Expected model loading to fail.";
+  EXPECT_THAT(error.data(), HasSubstr("filename argument required"));
+}
+
+TEST_F(LoadXmlTest, InvalidFileFails) {
+  std::array<char, 1000> error;
+  mjSpec* spec = mj_parseXML("invalid", nullptr, error.data(), error.size());
+  EXPECT_THAT(spec, IsNull()) << "Expected model loading to fail.";
+  EXPECT_THAT(error.data(), HasSubstr("Error opening file"));
+}
+
 TEST_F(MujocoTest, SaveXmlShortString) {
   std::array<char, 1000> error;
 
@@ -197,6 +211,16 @@ TEST_F(MujocoTest, SaveXmlWithDefaultMesh) {
   mj_deleteSpec(saved_spec);
   mj_deleteModel(model);
   mj_deleteModel(saved_model);
+}
+
+TEST_F(MujocoTest, FreeLastXml) {
+  static constexpr char xml[] = "<mujoco/>";
+  mjModel* model = LoadModelFromString(xml, 0, 0);
+  ASSERT_THAT(model, NotNull());
+  mj_deleteModel(model);
+  ASSERT_NE(mj_saveLastXML(nullptr, nullptr, nullptr, 0), 0);
+  mj_freeLastXML();
+  ASSERT_EQ(mj_saveLastXML(nullptr, nullptr, nullptr, 0), 0);
 }
 
 }  // namespace

@@ -18,19 +18,13 @@
 #include <mujoco/mjdata.h>
 #include <mujoco/mjexport.h>
 #include <mujoco/mjmodel.h>
-#include <mujoco/mjxmacro.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+
 //-------------------------- Jacobian-related ------------------------------------------------------
-
-// determine type of friction cone
-MJAPI int mj_isPyramidal(const mjModel* m);
-
-// determine type of constraint Jacobian
-MJAPI int mj_isSparse(const mjModel* m);
 
 // determine type of solver
 MJAPI int mj_isDual(const mjModel* m);
@@ -38,16 +32,9 @@ MJAPI int mj_isDual(const mjModel* m);
 // multiply Jacobian by vector
 MJAPI void mj_mulJacVec(const mjModel* m, const mjData* d, mjtNum* res, const mjtNum* vec);
 
-// multiply Jacobian by vector, for one island
-MJAPI void mj_mulJacVec_island(const mjModel* m, const mjData* d, mjtNum* res, const mjtNum* vec,
-                               int island, int flg_resunc, int flg_vecunc);
-
 // multiply JacobianT by vector
 MJAPI void mj_mulJacTVec(const mjModel* m, const mjData* d, mjtNum* res, const mjtNum* vec);
 
-// multiply JacobianT by vector, for one island
-MJAPI void mj_mulJacTVec_island(const mjModel* m, const mjData* d, mjtNum* res, const mjtNum* vec,
-                                int island, int flg_resunc, int flg_vecunc);
 
 //-------------------------- utility functions -----------------------------------------------------
 
@@ -66,7 +53,6 @@ mjtNum mj_assignMargin(const mjModel* m, mjtNum source);
 // add contact to d->contact list; return 0 if success; 1 if buffer full
 MJAPI int mj_addContact(const mjModel* m, mjData* d, const mjContact* con);
 
-
 //-------------------------- constraint instantiation ----------------------------------------------
 
 // equality constraints
@@ -78,8 +64,14 @@ void mj_instantiateFriction(const mjModel* m, mjData* d);
 // joint and tendon limits
 void mj_instantiateLimit(const mjModel* m, mjData* d);
 
-// frictionelss and frictional contacts
+// frictionless and frictional contacts
 void mj_instantiateContact(const mjModel* m, mjData* d);
+
+// compute Jacobian for contact, return number of DOFs affected
+int mj_contactJacobian(const mjModel* m, mjData* d, const mjContact* con, int dim,
+                       mjtNum* jac, mjtNum* jacdif, mjtNum* jacdifp,
+                       mjtNum* jacdifr, mjtNum* jac1p, mjtNum* jac2p,
+                       mjtNum* jac1r, mjtNum* jac2r, int* chain);
 
 
 //------------------------ parameter computation/extraction ----------------------------------------
@@ -89,6 +81,7 @@ void mj_diagApprox(const mjModel* m, mjData* d);
 
 // compute efc_R, efc_D, efc_KDIP, adjust diagApprox
 void mj_makeImpedance(const mjModel* m, mjData* d);
+
 
 //---------------------------- top-level API for constraint construction ---------------------------
 
@@ -101,14 +94,19 @@ MJAPI void mj_projectConstraint(const mjModel* m, mjData* d);
 // compute efc_vel, efc_aref
 MJAPI void mj_referenceConstraint(const mjModel* m, mjData* d);
 
+// compute efc_state, efc_force
+//  optional: cost(qacc) = s_hat(jar); cone Hessians
+MJAPI void mj_constraintUpdate_impl(int ne, int nf, int nefc,
+                                    const mjtNum* D, const mjtNum* R, const mjtNum* floss,
+                                    const mjtNum* jar, const int* type, const int* id,
+                                    mjContact* contact, int* state, mjtNum* force, mjtNum cost[1],
+                                    int flg_coneHessian);
+
 // compute efc_state, efc_force, qfrc_constraint
-// optional: cost(qacc) = shat(jar) where jar = Jac*qacc-aref; cone Hessians
+// optional: cost(qacc) = s_hat(jar) where jar = Jac*qacc-aref; cone Hessians
 MJAPI void mj_constraintUpdate(const mjModel* m, mjData* d, const mjtNum* jar,
                                mjtNum cost[1], int flg_coneHessian);
 
-// compute efc_state, efc_force, qfrc_constraint for one island
-MJAPI void mj_constraintUpdate_island(const mjModel* m, mjData* d, const mjtNum* jar,
-                                      mjtNum cost[1], int flg_coneHessian, int island);
 
 #ifdef __cplusplus
 }

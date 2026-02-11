@@ -39,6 +39,8 @@ ClangJsonNode = Mapping[str, Any]
 
 _ANONYMOUS_KEY_PATTERN = re.compile(r'\d+:\d+(?=\))')
 _EXCLUDED = (
+    'mjpDecoder',
+    'mjpDecoder_',
     'mjpPlugin',
     'mjpPlugin_',
     'mjpResourceProvider',
@@ -47,7 +49,7 @@ _EXCLUDED = (
     'mjResource_',
 )
 
-_ARRAY_COMMENT_PATTERN = re.compile(r'(.+?)\s\s+\((.+) x (.+)\)\Z')
+_ARRAY_COMMENT_PATTERN = re.compile(r'(.+?)\s+\(([^\(\)]+) x ([^\(\)]+)\)\Z')
 
 
 def traverse(node, visitor):
@@ -93,16 +95,19 @@ class MjStructVisitor:
     # No valid normalization, just parse the declname.
     return type_parsing.parse_type(declname)
 
-  def _make_comment(self, node: ClangJsonNode) -> str:
+  def _make_comment(self, node: ClangJsonNode, strip: bool = True) -> str:
     """Makes a comment string from a Clang AST FullComment node."""
     kind = node.get('kind')
     if kind == 'TextComment':
-      return node['text'].replace('\N{NO-BREAK SPACE}', '&nbsp;').strip()
+      retval = node['text'].replace('\N{NO-BREAK SPACE}', '&nbsp;')
     else:
       strings = []
       for child in node['inner']:
-        strings.append(self._make_comment(child))
-      return ''.join(strings).strip()
+        strings.append(self._make_comment(child, strip=False))
+      retval = ''.join(strings)
+    if strip:
+      retval = retval.strip()
+    return retval
 
   def _make_field(
       self, node: ClangJsonNode
