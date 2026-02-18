@@ -1,4 +1,4 @@
-# Copyright 2025 DeepMind Technologies Limited
+# Copyright 2026 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,9 @@
 # ==============================================================================
 
 """DO NOT EDIT. This file is auto-generated."""
+
 import dataclasses
+import functools
 import jax
 from mujoco.mjx._src import types
 from mujoco.mjx.warp import ffi
@@ -46,6 +48,8 @@ _e = mjwarp.Constraint(
 def _kinematics_shim(
     # Model
     nworld: int,
+    body_branch_start: wp.array(dtype=int),
+    body_branches: wp.array(dtype=int),
     body_ipos: wp.array2d(dtype=wp.vec3),
     body_iquat: wp.array2d(dtype=wp.quat),
     body_jntadr: wp.array(dtype=int),
@@ -55,7 +59,6 @@ def _kinematics_shim(
     body_pos: wp.array2d(dtype=wp.vec3),
     body_quat: wp.array2d(dtype=wp.quat),
     body_rootid: wp.array(dtype=int),
-    body_tree: tuple[wp.array(dtype=int), ...],
     body_weldid: wp.array(dtype=int),
     geom_bodyid: wp.array(dtype=int),
     geom_pos: wp.array2d(dtype=wp.vec3),
@@ -64,6 +67,8 @@ def _kinematics_shim(
     jnt_pos: wp.array2d(dtype=wp.vec3),
     jnt_qposadr: wp.array(dtype=int),
     jnt_type: wp.array(dtype=int),
+    nbody: int,
+    nbranch: int,
     ngeom: int,
     nsite: int,
     qpos0: wp.array2d(dtype=float),
@@ -90,6 +95,8 @@ def _kinematics_shim(
   _m.opt = _o
   _d.efc = _e
   _d.contact = _c
+  _m.body_branch_start = body_branch_start
+  _m.body_branches = body_branches
   _m.body_ipos = body_ipos
   _m.body_iquat = body_iquat
   _m.body_jntadr = body_jntadr
@@ -99,7 +106,6 @@ def _kinematics_shim(
   _m.body_pos = body_pos
   _m.body_quat = body_quat
   _m.body_rootid = body_rootid
-  _m.body_tree = body_tree
   _m.body_weldid = body_weldid
   _m.geom_bodyid = geom_bodyid
   _m.geom_pos = geom_pos
@@ -108,6 +114,8 @@ def _kinematics_shim(
   _m.jnt_pos = jnt_pos
   _m.jnt_qposadr = jnt_qposadr
   _m.jnt_type = jnt_type
+  _m.nbody = nbody
+  _m.nbranch = nbranch
   _m.ngeom = ngeom
   _m.nsite = nsite
   _m.qpos0 = qpos0
@@ -151,7 +159,7 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
       num_outputs=11,
       output_dims=output_dims,
       vmap_method=None,
-      in_out_argnames={
+      in_out_argnames=set([
           'geom_xmat',
           'geom_xpos',
           'site_xmat',
@@ -163,8 +171,8 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
           'xmat',
           'xpos',
           'xquat',
-      },
-      stage_in_argnames={
+      ]),
+      stage_in_argnames=set([
           'body_ipos',
           'body_iquat',
           'body_pos',
@@ -190,8 +198,8 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
           'xmat',
           'xpos',
           'xquat',
-      },
-      stage_out_argnames={
+      ]),
+      stage_out_argnames=set([
           'geom_xmat',
           'geom_xpos',
           'site_xmat',
@@ -203,11 +211,13 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
           'xmat',
           'xpos',
           'xquat',
-      },
+      ]),
       graph_mode=m.opt._impl.graph_mode,
   )
   out = jf(
       d.qpos.shape[0],
+      m._impl.body_branch_start,
+      m._impl.body_branches,
       m.body_ipos,
       m.body_iquat,
       m.body_jntadr,
@@ -217,7 +227,6 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
       m.body_pos,
       m.body_quat,
       m.body_rootid,
-      m._impl.body_tree,
       m.body_weldid,
       m.geom_bodyid,
       m.geom_pos,
@@ -226,6 +235,8 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
       m.jnt_pos,
       m.jnt_qposadr,
       m.jnt_type,
+      m.nbody,
+      m._impl.nbranch,
       m.ngeom,
       m.nsite,
       m.qpos0,
@@ -267,9 +278,13 @@ def _kinematics_jax_impl(m: types.Model, d: types.Data):
 @ffi.marshal_jax_warp_callable
 def kinematics(m: types.Model, d: types.Data):
   return _kinematics_jax_impl(m, d)
+
+
 @kinematics.def_vmap
 @ffi.marshal_custom_vmap
-def kinematics_vmap(unused_axis_size, is_batched, m, d):
+def kinematics_vmap(
+    unused_axis_size, is_batched, m: types.Model, d: types.Data
+):
   d = kinematics(m, d)
   return d, is_batched[1]
 
@@ -372,15 +387,15 @@ def _tendon_jax_impl(m: types.Model, d: types.Data):
       num_outputs=6,
       output_dims=output_dims,
       vmap_method=None,
-      in_out_argnames={
+      in_out_argnames=set([
           'ten_J',
           'ten_length',
           'ten_wrapadr',
           'ten_wrapnum',
           'wrap_obj',
           'wrap_xpos',
-      },
-      stage_in_argnames={
+      ]),
+      stage_in_argnames=set([
           'cdof',
           'geom_size',
           'geom_xmat',
@@ -389,8 +404,8 @@ def _tendon_jax_impl(m: types.Model, d: types.Data):
           'site_xpos',
           'subtree_com',
           'ten_length',
-      },
-      stage_out_argnames={'ten_length'},
+      ]),
+      stage_out_argnames=set(['ten_length']),
       graph_mode=m.opt._impl.graph_mode,
   )
   out = jf(
@@ -446,8 +461,10 @@ def _tendon_jax_impl(m: types.Model, d: types.Data):
 @ffi.marshal_jax_warp_callable
 def tendon(m: types.Model, d: types.Data):
   return _tendon_jax_impl(m, d)
+
+
 @tendon.def_vmap
 @ffi.marshal_custom_vmap
-def tendon_vmap(unused_axis_size, is_batched, m, d):
+def tendon_vmap(unused_axis_size, is_batched, m: types.Model, d: types.Data):
   d = tendon(m, d)
   return d, is_batched[1]

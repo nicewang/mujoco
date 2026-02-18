@@ -17,7 +17,7 @@
 import copy
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import warnings
 
 import jax
@@ -52,7 +52,9 @@ def _is_cuda_gpu_device(device: jax.Device) -> bool:
 
 def _check_warp_installed():
   if not mjxw.WARP_INSTALLED:
-    raise RuntimeError('warp-lang is not installed. Cannot use WARP implementation of MJX.')
+    raise RuntimeError(
+        'warp-lang is not installed. Cannot use WARP implementation of MJX.'
+    )
 
 
 def _resolve_impl(
@@ -121,8 +123,7 @@ def _check_impl_device_compatibility(
   if impl == types.Impl.WARP:
     if not _is_cuda_gpu_device(device):
       raise AssertionError(
-          'Warp implementation requires a CUDA GPU device, got '
-          f'{device}.'
+          f'Warp implementation requires a CUDA GPU device, got {device}.'
       )
     _check_warp_installed()
 
@@ -768,8 +769,8 @@ def _make_data_c(
       'flexedge_length': (nflexedge, float_),
       'ten_J_rownnz': (m.ntendon, np.int32),
       'ten_J_rowadr': (m.ntendon, np.int32),
-      'ten_J_colind': (m.ntendon, m.nv, np.int32),
-      'ten_J': (m.ntendon, m.nv, float_),
+      'ten_J_colind': (m.nJten, np.int32),
+      'ten_J': (m.nJten, float_),
       'ten_wrapadr': (m.ntendon, np.int32),
       'ten_wrapnum': (m.ntendon, np.int32),
       'wrap_obj': (m.nwrap, 2, np.int32),
@@ -999,8 +1000,7 @@ def make_data(
 
   if isinstance(m, types.Model) and m.impl != impl:
     raise ValueError(
-        f'Model impl {m.impl} does not match make_data '
-        f'implementation {impl}.'
+        f'Model impl {m.impl} does not match make_data implementation {impl}.'
     )
 
   if impl == types.Impl.JAX:
@@ -1099,7 +1099,7 @@ def _put_data_jax(
   # MJX does not support islanding, so only transfer the first solver_niter
   impl_fields['solver_niter'] = impl_fields['solver_niter'][0]
 
-  # convert sparse representation of actuator_moment to dense matrix
+  # convert sparse actuator_moment to dense matrix
   moment = np.zeros((m.nu, m.nv))
   mujoco.mju_sparse2dense(
       moment,
@@ -1109,6 +1109,22 @@ def _put_data_jax(
       d.moment_colind,
   )
   impl_fields['actuator_moment'] = moment
+
+  # convert ten_J to dense matrix
+  if mujoco.mj_isSparse(m):
+    ten_J = np.zeros((m.ntendon, m.nv))
+    mujoco.mju_sparse2dense(
+        ten_J,
+        d.ten_J,
+        d.ten_J_rownnz,
+        d.ten_J_rowadr,
+        d.ten_J_colind,
+    )
+  elif m.ntendon:
+    ten_J = d.ten_J.reshape((m.ntendon, m.nv))
+  else:
+    ten_J = np.zeros((m.ntendon, m.nv))
+  impl_fields['ten_J'] = ten_J
 
   contact, contact_map = _put_contact(d.contact, dim, efc_address)
 
@@ -1470,10 +1486,11 @@ def _get_data_into_warp(
       if field.name in (
           'actuator_moment',
           'contact',
-          'efc_J',
           'qM',
           'qLD',
           'qLDiagInv',
+          'ten_J',
+          'flexedge_J',
       ):
         continue
       if field.name.startswith('efc_'):
@@ -1530,8 +1547,7 @@ def _get_data_into(
       all_fields = types.Data.fields() + types.DataC.fields()
     else:
       raise NotImplementedError(
-          f'get_data_into for implementation "{d.impl}" not implemented'
-          ' yet.'
+          f'get_data_into for implementation "{d.impl}" not implemented yet.'
       )
 
     for field in all_fields:
@@ -1566,6 +1582,29 @@ def _get_data_into(
         result_i.moment_rowadr[:] = moment_rowadr
         result_i.moment_colind[:] = moment_colind
         result_i.actuator_moment[:] = actuator_moment
+        continue
+
+      # MuJoCo ten_J is sparse, MJX uses a dense representation.
+      if field.name == 'ten_J':
+        ten_j_rownnz = np.zeros(m.ntendon, dtype=np.int32)
+        ten_j_rowadr = np.zeros(m.ntendon, dtype=np.int32)
+        ten_j_colind = np.zeros(m.nJten, dtype=np.int32)
+        ten_j = np.zeros(m.nJten)
+        if m.ntendon:
+          if d_i.impl == types.Impl.JAX:
+            mujoco.mju_dense2sparse(
+                ten_j,
+                d_i._impl.ten_J,
+                ten_j_rownnz,
+                ten_j_rowadr,
+                ten_j_colind,
+            )
+          else:
+            ten_j = d_i._impl.ten_J
+        result_i.ten_J_rownnz[:] = ten_j_rownnz
+        result_i.ten_J_rowadr[:] = ten_j_rowadr
+        result_i.ten_J_colind[:] = ten_j_colind
+        result_i.ten_J[:] = ten_j
         continue
 
       if hasattr(d_i._impl, field.name):
@@ -1660,8 +1699,9 @@ def _get_data_into_cpp(
   # mjx.Model which we don't have access to in this function.
   fields_to_check = ['qpos', 'qvel', 'act', 'mocap_pos', 'mocap_quat']
   for i in range(batch_size):
-    d_i: types.Data = jax.tree_util.tree_map(
-        lambda x, i=i: x[i], d) if batched else d
+    d_i: types.Data = (
+        jax.tree_util.tree_map(lambda x, i=i: x[i], d) if batched else d
+    )
     src_data = mj_data_list[i]
 
     needs_syncing = False
@@ -1900,3 +1940,26 @@ def set_state(
       offset += size
 
   return d.replace(**updates)
+
+
+def create_render_context(
+    mjm: mujoco.MjModel,
+    nworld: int,
+    **kwargs,
+):
+  """Creates a render context.
+
+  Args:
+    mjm: the MuJoCo model
+    nworld: number of worlds to render. We must hardcode the nworld
+      because Warp creates arrays of size nworld that are not exposed
+      to JAX. Thus we cannot use JAX transforms like vmap with the
+      render context.
+    **kwargs: forwarded to the render context constructor.
+
+  Returns:
+    Render context object that is JAX compatible.
+  """
+  _check_warp_installed()
+  from mujoco.mjx.warp import io as mjxw_io  # pylint: disable=g-import-not-at-top  # pytype: disable=import-error
+  return mjxw_io.create_render_context(mjm, nworld=nworld, **kwargs)

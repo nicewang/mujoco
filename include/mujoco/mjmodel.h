@@ -754,6 +754,7 @@ struct mjModel_ {
   // sizes set after mjModel construction
   mjtSize nnames_map;             // number of slots in the names hash map
   mjtSize nJmom;                  // number of non-zeros in sparse actuator_moment matrix
+  mjtSize nJten;                  // number of non-zeros in sparse ten_J matrix
   mjtSize ngravcomp;              // number of bodies with nonzero gravcomp
   mjtSize nemax;                  // number of potential equality-constraint rows
   mjtSize njmax;                  // number of available rows in constraint Jacobian (legacy)
@@ -1099,7 +1100,7 @@ struct mjModel_ {
   int*      tex_height;           // number of rows in texture image          (ntex x 1)
   int*      tex_width;            // number of columns in texture image       (ntex x 1)
   int*      tex_nchannel;         // number of channels in texture image      (ntex x 1)
-  int*      tex_adr;              // start address in tex_data                (ntex x 1)
+  mjtSize*  tex_adr;              // start address in tex_data                (ntex x 1)
   mjtByte*  tex_data;             // pixel values                             (ntexdata x 1)
   int*      tex_pathadr;          // address of texture asset path; -1: none  (ntex x 1)
 

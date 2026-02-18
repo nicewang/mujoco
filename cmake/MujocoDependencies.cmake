@@ -39,12 +39,12 @@ set(MUJOCO_DEP_VERSION_qhull
     CACHE STRING "Version of `qhull` to be fetched."
 )
 set(MUJOCO_DEP_VERSION_Eigen3
-    49623d0c4e1af3c680845191948d10f6d3e92f8a
+    75bcd155c40cb48e647c87c3f29052360255bc9e
     CACHE STRING "Version of `Eigen3` to be fetched."
 )
 
 set(MUJOCO_DEP_VERSION_abseil
-    d38452e1ee03523a208362186fd42248ff2609f6 # LTS 20250814.1
+    255c84dadd029fd8ad25c5efb5933e47beaa00c7 # LTS 20250814.1
     CACHE STRING "Version of `abseil` to be fetched."
 )
 
@@ -54,7 +54,7 @@ set(MUJOCO_DEP_VERSION_gtest
 )
 
 set(MUJOCO_DEP_VERSION_benchmark
-    5f7d66929fb66869d96dfcbacf0d8a586b33766d
+    5c55f5d4f45a1b09c5d98aa63a671993ebd42c69
     CACHE STRING "Version of `benchmark` to be fetched."
 )
 
@@ -339,9 +339,7 @@ if(MUJOCO_BUILD_TESTS)
         "sed"
         "-i"
         "-e"
-        "s/-std=c++11/-std=c++14/g"
-        "-e"
-        "s/HAVE_CXX_FLAG_STD_CXX11/HAVE_CXX_FLAG_STD_CXX14/g"
+        "s/-Wformat=2/-Wformat/g"
         "${CMAKE_BINARY_DIR}/_deps/benchmark-src/CMakeLists.txt"
     )
   endif()

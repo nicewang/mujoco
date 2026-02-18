@@ -669,9 +669,6 @@ void UpdateWatch(mj::Simulate* sim, const mjModel* m, const mjData* d) {
   sim->ui0.sect[SECT_WATCH].item[2].multi.nelem = 1;
   mju::strcpy_arr(sim->ui0.sect[SECT_WATCH].item[2].multi.name[0], "invalid field");
 
-  // prepare symbols needed by xmacro
-  MJDATA_POINTERS_PREAMBLE(m);
-
   // find specified field in mjData arrays, update value
   #define X(TYPE, NAME, NR, NC)                                                                  \
     if (!mju::strcmp_arr(#NAME, sim->field) &&                                                   \
@@ -1587,22 +1584,24 @@ void UiEvent(mjuiState* state) {
 
     // rendering section
     else if (it && it->sectionid==SECT_RENDERING) {
-      // set camera in mjvCamera
-      if (sim->camera==0) {
-        sim->cam.type = mjCAMERA_FREE;
-      } else if (sim->camera==1) {
-        if (sim->pert.select>0) {
-          sim->cam.type = mjCAMERA_TRACKING;
-          sim->cam.trackbodyid = sim->pert.select;
-          sim->cam.fixedcamid = -1;
-        } else {
+      // only update the camera when the camera itself changed
+      if (it->pdata == &sim->camera) {
+        if (sim->camera==0) {
           sim->cam.type = mjCAMERA_FREE;
-          sim->camera = 0;
-          mjui0_update_section(sim, SECT_RENDERING);
+        } else if (sim->camera==1) {
+          if (sim->pert.select>0) {
+            sim->cam.type = mjCAMERA_TRACKING;
+            sim->cam.trackbodyid = sim->pert.select;
+            sim->cam.fixedcamid = -1;
+          } else {
+            sim->cam.type = mjCAMERA_FREE;
+            sim->camera = 0;
+            mjui0_update_section(sim, SECT_RENDERING);
+          }
+        } else {
+          sim->cam.type = mjCAMERA_FIXED;
+          sim->cam.fixedcamid = sim->camera - 2;
         }
-      } else {
-        sim->cam.type = mjCAMERA_FIXED;
-        sim->cam.fixedcamid = sim->camera - 2;
       }
       // copy camera spec to clipboard (as MJCF element)
       if (it->itemid == 3) {

@@ -1,4 +1,4 @@
-# Copyright 2025 DeepMind Technologies Limited
+# Copyright 2026 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,9 @@
 # ==============================================================================
 
 """DO NOT EDIT. This file is auto-generated."""
+
 import dataclasses
+import functools
 import jax
 from mujoco.mjx._src import types
 from mujoco.mjx.warp import ffi
@@ -112,10 +114,8 @@ def _collision_shim(
     opt__sdf_initpoints: int,
     opt__sdf_iterations: int,
     # Data
+    naccdmax: int,
     naconmax: int,
-    collision_pair: wp.array(dtype=wp.vec2i),
-    collision_pairid: wp.array(dtype=wp.vec2i),
-    collision_worldid: wp.array(dtype=int),
     geom_xmat: wp.array2d(dtype=wp.mat33),
     geom_xpos: wp.array2d(dtype=wp.vec3),
     nacon: wp.array(dtype=int),
@@ -203,9 +203,6 @@ def _collision_shim(
   _m.pair_solreffriction = pair_solreffriction
   _m.plugin = plugin
   _m.plugin_attr = plugin_attr
-  _d.collision_pair = collision_pair
-  _d.collision_pairid = collision_pairid
-  _d.collision_worldid = collision_worldid
   _d.contact.dim = contact__dim
   _d.contact.dist = contact__dist
   _d.contact.frame = contact__frame
@@ -221,6 +218,7 @@ def _collision_shim(
   _d.contact.worldid = contact__worldid
   _d.geom_xmat = geom_xmat
   _d.geom_xpos = geom_xpos
+  _d.naccdmax = naccdmax
   _d.nacon = nacon
   _d.naconmax = naconmax
   _d.ncollision = ncollision
@@ -230,9 +228,6 @@ def _collision_shim(
 
 def _collision_jax_impl(m: types.Model, d: types.Data):
   output_dims = {
-      'collision_pair': d._impl.collision_pair.shape,
-      'collision_pairid': d._impl.collision_pairid.shape,
-      'collision_worldid': d._impl.collision_worldid.shape,
       'nacon': d._impl.nacon.shape,
       'ncollision': d._impl.ncollision.shape,
       'contact__dim': d._impl.contact__dim.shape,
@@ -251,13 +246,10 @@ def _collision_jax_impl(m: types.Model, d: types.Data):
   }
   jf = ffi.jax_callable_variadic_tuple(
       _collision_shim,
-      num_outputs=18,
+      num_outputs=15,
       output_dims=output_dims,
       vmap_method=None,
-      in_out_argnames={
-          'collision_pair',
-          'collision_pairid',
-          'collision_worldid',
+      in_out_argnames=set([
           'nacon',
           'ncollision',
           'contact__dim',
@@ -273,8 +265,8 @@ def _collision_jax_impl(m: types.Model, d: types.Data):
           'contact__solreffriction',
           'contact__type',
           'contact__worldid',
-      },
-      stage_in_argnames={
+      ]),
+      stage_in_argnames=set([
           'geom_aabb',
           'geom_friction',
           'geom_gap',
@@ -293,8 +285,8 @@ def _collision_jax_impl(m: types.Model, d: types.Data):
           'pair_solimp',
           'pair_solref',
           'pair_solreffriction',
-      },
-      stage_out_argnames={},
+      ]),
+      stage_out_argnames=set([]),
       graph_mode=m.opt._impl.graph_mode,
   )
   out = jf(
@@ -364,10 +356,8 @@ def _collision_jax_impl(m: types.Model, d: types.Data):
       m.opt.enableflags,
       m.opt._impl.sdf_initpoints,
       m.opt._impl.sdf_iterations,
+      d._impl.naccdmax,
       d._impl.naconmax,
-      d._impl.collision_pair,
-      d._impl.collision_pairid,
-      d._impl.collision_worldid,
       d.geom_xmat,
       d.geom_xpos,
       d._impl.nacon,
@@ -387,24 +377,21 @@ def _collision_jax_impl(m: types.Model, d: types.Data):
       d._impl.contact__worldid,
   )
   d = d.tree_replace({
-      '_impl.collision_pair': out[0],
-      '_impl.collision_pairid': out[1],
-      '_impl.collision_worldid': out[2],
-      '_impl.nacon': out[3],
-      '_impl.ncollision': out[4],
-      '_impl.contact__dim': out[5],
-      '_impl.contact__dist': out[6],
-      '_impl.contact__frame': out[7],
-      '_impl.contact__friction': out[8],
-      '_impl.contact__geom': out[9],
-      '_impl.contact__geomcollisionid': out[10],
-      '_impl.contact__includemargin': out[11],
-      '_impl.contact__pos': out[12],
-      '_impl.contact__solimp': out[13],
-      '_impl.contact__solref': out[14],
-      '_impl.contact__solreffriction': out[15],
-      '_impl.contact__type': out[16],
-      '_impl.contact__worldid': out[17],
+      '_impl.nacon': out[0],
+      '_impl.ncollision': out[1],
+      '_impl.contact__dim': out[2],
+      '_impl.contact__dist': out[3],
+      '_impl.contact__frame': out[4],
+      '_impl.contact__friction': out[5],
+      '_impl.contact__geom': out[6],
+      '_impl.contact__geomcollisionid': out[7],
+      '_impl.contact__includemargin': out[8],
+      '_impl.contact__pos': out[9],
+      '_impl.contact__solimp': out[10],
+      '_impl.contact__solref': out[11],
+      '_impl.contact__solreffriction': out[12],
+      '_impl.contact__type': out[13],
+      '_impl.contact__worldid': out[14],
   })
   return d
 
@@ -413,8 +400,10 @@ def _collision_jax_impl(m: types.Model, d: types.Data):
 @ffi.marshal_jax_warp_callable
 def collision(m: types.Model, d: types.Data):
   return _collision_jax_impl(m, d)
+
+
 @collision.def_vmap
 @ffi.marshal_custom_vmap
-def collision_vmap(unused_axis_size, is_batched, m, d):
+def collision_vmap(unused_axis_size, is_batched, m: types.Model, d: types.Data):
   d = collision(m, d)
   return d, is_batched[1]

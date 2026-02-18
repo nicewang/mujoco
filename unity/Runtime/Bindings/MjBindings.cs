@@ -112,7 +112,7 @@ public const int mjMAXLINEPNT = 1001;
 public const int mjMAXPLANEGRID = 200;
 public const bool THIRD_PARTY_MUJOCO_MJXMACRO_H_ = true;
 public const bool THIRD_PARTY_MUJOCO_MUJOCO_H_ = true;
-public const int mjVERSION_HEADER = 350;
+public const int mjVERSION_HEADER = 3005001;
 
 
 // ------------------------------------Enums------------------------------------
@@ -5371,6 +5371,7 @@ public unsafe struct mjModel_ {
   public Int64 npaths;
   public Int64 nnames_map;
   public Int64 nJmom;
+  public Int64 nJten;
   public Int64 ngravcomp;
   public Int64 nemax;
   public Int64 njmax;
@@ -5673,7 +5674,7 @@ public unsafe struct mjModel_ {
   public int* tex_height;
   public int* tex_width;
   public int* tex_nchannel;
-  public int* tex_adr;
+  public Int64* tex_adr;
   public byte* tex_data;
   public int* tex_pathadr;
   public int* mat_texid;

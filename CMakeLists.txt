@@ -29,7 +29,7 @@ set(MSVC_INCREMENTAL_DEFAULT ON)
 
 project(
   mujoco
-  VERSION 3.5.0
+  VERSION 3.5.1
   DESCRIPTION "MuJoCo Physics Simulator"
   HOMEPAGE_URL "https://mujoco.org"
 )
@@ -217,6 +217,7 @@ if(MUJOCO_BUILD_SIMULATE)
 endif()
 
 if(MUJOCO_BUILD_STUDIO)
+  add_subdirectory(src/experimental/mjz)
   add_subdirectory(src/experimental/platform)
   add_subdirectory(src/experimental/studio)
 endif()
